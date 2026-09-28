@@ -1,0 +1,77 @@
+{
+  "descripcion": "Prueba de humo de la Fase 3 (Pregunta libre con RAG). 5 preguntas en español, como las haría el usuario. 'debe' = lo que la respuesta tiene que contener; 'no_debe' = lo que la invalida; 'fuentes' = URLs oficiales que deberían aparecer entre las citas (basta una).",
+  "version_docs": "v5.3.8",
+  "preguntas": [
+    {
+      "id": 1,
+      "tipo": "directa",
+      "pregunta": "¿Cómo centro un div horizontalmente?",
+      "debe": [
+        "mx-auto en un elemento de bloque con ancho definido",
+        "o flexbox en el padre: d-flex + justify-content-center"
+      ],
+      "no_debe": ["center-block (Bootstrap 3)", "inventar clases que no existen"],
+      "fuentes": [
+        "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+        "https://getbootstrap.com/docs/5.3/utilities/flex/#justify-content"
+      ]
+    },
+    {
+      "id": 2,
+      "tipo": "combinar varias secciones",
+      "pregunta": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+      "debe": [
+        "navbar-expand-{breakpoint} (p. ej. navbar-expand-lg) para decidir cuándo colapsa",
+        "botón navbar-toggler con data-bs-toggle=\"collapse\" y data-bs-target apuntando al .collapse.navbar-collapse",
+        "nav-item dropdown con dropdown-toggle, data-bs-toggle=\"dropdown\" y dropdown-menu",
+        "un ejemplo de código HTML"
+      ],
+      "no_debe": ["data-toggle / data-target sin el prefijo bs (Bootstrap 4)"],
+      "fuentes": [
+        "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+        "https://getbootstrap.com/docs/5.3/components/navbar/#nav"
+      ]
+    },
+    {
+      "id": 3,
+      "tipo": "personalización (Sass)",
+      "pregunta": "¿Cómo cambio el color primary?",
+      "debe": [
+        "sobrescribir $primary (o el mapa $theme-colors) en Sass",
+        "hacerlo después de importar functions y antes de importar variables"
+      ],
+      "no_debe": ["decir que basta con editar bootstrap.min.css"],
+      "fuentes": [
+        "https://getbootstrap.com/docs/5.3/customize/sass/#variable-defaults",
+        "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+        "https://getbootstrap.com/docs/5.3/customize/color/"
+      ]
+    },
+    {
+      "id": 4,
+      "tipo": "trampa de Bootstrap 4",
+      "pregunta": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+      "debe": [
+        "aclarar que ml-3 y data-toggle son de Bootstrap 4",
+        "en 5.3: ms-3 (start) en lugar de ml-3, por el soporte RTL",
+        "en 5.3: data-bs-toggle en lugar de data-toggle"
+      ],
+      "no_debe": ["dar ml-3 o data-toggle como válidos en 5.3"],
+      "fuentes": [
+        "https://getbootstrap.com/docs/5.3/utilities/spacing/",
+        "https://getbootstrap.com/docs/5.3/migration/"
+      ]
+    },
+    {
+      "id": 5,
+      "tipo": "fuera de la documentación",
+      "pregunta": "¿Cómo integro Bootstrap con Tailwind?",
+      "debe": [
+        "decir que no está en la documentación de Bootstrap 5.3",
+        "no inventar una guía de integración"
+      ],
+      "no_debe": ["pasos de instalación de Tailwind", "citar URLs que no hablen del tema"],
+      "fuentes": []
+    }
+  ]
+}
