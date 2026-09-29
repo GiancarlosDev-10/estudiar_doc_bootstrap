@@ -1,0 +1,17 @@
+{
+  "descripcion": "Calibración del UMBRAL de similitud (nodo '¿Hay contexto?' de [BS] Pregunta libre (RAG)). 6 preguntas que SÍ están en la documentación de Bootstrap 5.3 y 6 que claramente NO. Correr con [BS] Test RAG y mirar top_similarity de cada una: el umbral debe caer en el hueco entre el grupo 'dentro' y el grupo 'fuera'.",
+  "preguntas": [
+    { "id": "d1", "grupo": "dentro", "pregunta": "¿Cómo hago que una tabla sea responsive?" },
+    { "id": "d2", "grupo": "dentro", "pregunta": "¿Qué clases hay para el tamaño de los botones?" },
+    { "id": "d3", "grupo": "dentro", "pregunta": "¿Cómo funciona el sistema de breakpoints del grid?" },
+    { "id": "d4", "grupo": "dentro", "pregunta": "¿Cómo valido un formulario con las clases de Bootstrap?" },
+    { "id": "d5", "grupo": "dentro", "pregunta": "¿Qué opciones tiene el componente Toast?" },
+    { "id": "d6", "grupo": "dentro", "pregunta": "¿Cómo cambio el z-index de un modal?" },
+    { "id": "f1", "grupo": "fuera", "pregunta": "¿Cómo integro Bootstrap con Tailwind?" },
+    { "id": "f2", "grupo": "fuera", "pregunta": "¿Cómo hago un hook personalizado en React?" },
+    { "id": "f3", "grupo": "fuera", "pregunta": "¿Cómo configuro un modelo en Django?" },
+    { "id": "f4", "grupo": "fuera", "pregunta": "¿Cuál es la receta de un pan de molde casero?" },
+    { "id": "f5", "grupo": "fuera", "pregunta": "¿Cómo entreno una red neuronal en PyTorch?" },
+    { "id": "f6", "grupo": "fuera", "pregunta": "¿Qué impuestos pago si trabajo como freelance en Perú?" }
+  ]
+}
