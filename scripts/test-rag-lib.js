@@ -28,7 +28,7 @@ test('buildContext numera y agrega heading_path', () => {
 
 test('buildContext muestra la reformulación solo si difiere', () => {
   assert.ok(!buildContext(chunks, 'a', 'a').includes('Reformulada'));
-  assert.match(buildContext(chunks, '¿y en móvil?', '¿Navbar en móvil?'), /¿y en móvil\?\n\(Reformulada .*¿Navbar en móvil\?\)/);
+  assert.match(buildContext(chunks, '¿y en móvil?', '¿Navbar en móvil?'), /¿y en móvil\?\n\(Consulta usada para buscar .*¿Navbar en móvil\?\)/);
 });
 
 test('llmText ignora las partes de thinking de Gemini; llmTokens suma los thoughts', () => {

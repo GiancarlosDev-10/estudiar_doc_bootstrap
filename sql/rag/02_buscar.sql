@@ -1,7 +1,7 @@
 -- =============================================================================
 -- rag/02_buscar.sql — [BS] Pregunta libre (RAG), nodo "Buscar fragmentos"
 --
--- Devuelve SIEMPRE una fila: chunks (JSON con los 6 fragmentos más cercanos,
+-- Devuelve SIEMPRE una fila: chunks (JSON con los TOPK fragmentos más cercanos,
 -- de mayor a menor similitud) y top_similarity (0 si no hubo ninguno).
 --
 -- similarity = 1 - distancia coseno: 1 es idéntico y 0 es ortogonal.
@@ -26,7 +26,7 @@ top AS (
     FROM doc_chunks c
    WHERE c.embedding IS NOT NULL
    ORDER BY c.embedding <=> (SELECT v FROM p)
-   LIMIT 6
+   LIMIT __TOPK__
 )
 SELECT coalesce(json_agg(top ORDER BY top.similarity DESC), '[]'::json) AS chunks,
        coalesce(max(top.similarity), 0)                                  AS top_similarity

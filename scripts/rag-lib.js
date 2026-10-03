@@ -25,15 +25,16 @@ const V4_PATTERNS = [
 // (turno de usuario, después del systemInstruction de prompts/rag.md).
 // chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.
 // -----------------------------------------------------------------------------
-// question = lo que escribió el usuario; searchQuery = la versión autónoma que
-// se usó para buscar. Si son distintas (hubo reescritura por historial), el LLM
-// ve las dos: la original conserva la intención, la autónoma resuelve el "eso".
+// question = lo que escribió el usuario; searchQuery = la consulta con la que
+// se buscó (traducida al inglés y/o con el "eso" resuelto por el historial).
+// Si son distintas, el LLM ve las dos: la original conserva la intención, la
+// de búsqueda resuelve las referencias.
 function buildContext(chunks, question, searchQuery = question) {
   const fragmentos = chunks
     .map((c, i) => `[${i + 1}] (${headingText(c)})\n${c.content}`)
     .join('\n\n---\n\n');
   const pregunta = searchQuery && searchQuery !== question
-    ? `${question}\n(Reformulada con el contexto de la conversación: ${searchQuery})`
+    ? `${question}\n(Consulta usada para buscar en la documentación: ${searchQuery})`
     : question;
   return `Fragmentos recuperados:\n\n${fragmentos}\n\nPregunta del usuario:\n${pregunta}`;
 }

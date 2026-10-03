@@ -75,6 +75,17 @@ const THINKING = { thinkingBudget: 0 };
 // --umbral 1.01 genera una versión de calibración: nada supera el umbral, así
 // que solo se miden similitudes, sin gastar llamadas al LLM.
 const UMBRAL = process.argv.includes('--umbral') ? Number(arg('umbral')) : 0.68;
+// Idioma de la consulta de búsqueda (experimento del 2026-10-03, ver
+// eval/fase3-recuperacion.json):
+//   es = se busca con la pregunta en español; el LLM solo reescribe si hay
+//        historial (prompts/rag-reescribir.md).
+//   en = siempre se traduce al inglés, el idioma de la documentación, y de paso
+//        se resuelven los seguimientos (prompts/rag-consulta.md). Cuesta una
+//        llamada corta más por pregunta.
+const CONSULTA = process.argv.includes('--consulta') ? arg('consulta') : 'es';
+if (!['es', 'en'].includes(CONSULTA)) throw new Error('--consulta debe ser es o en');
+// Cuántos fragmentos se recuperan y se le pasan al LLM.
+const TOPK = process.argv.includes('--topk') ? Number(arg('topk')) : 6;
 // ID de [BS] Pregunta libre (RAG) para [BS] Test RAG. Un workflow ID no es un
 // secreto; esta instancia no tiene feat:variables para pasarlo por variable.
 const PREGUNTA_WORKFLOW_ID = 'ry9T1L9MSmoOsqUl';
@@ -98,7 +109,7 @@ const promptBody = (file) => {
   return body;
 };
 const SYSTEM_PROMPT = promptBody('prompts/rag.md');
-const REWRITE_PROMPT = promptBody('prompts/rag-reescribir.md');
+const REWRITE_PROMPT = promptBody(CONSULTA === 'en' ? 'prompts/rag-consulta.md' : 'prompts/rag-reescribir.md');
 
 const ragLibSrc = read('scripts/rag-lib.js');
 
@@ -200,13 +211,17 @@ return { json: { ...base, empty: false } };`,
       jsonBody: `={{ JSON.stringify({
   model: '${REWRITE_MODEL}',
   messages: [{ role: 'system', content: ${JSON.stringify(REWRITE_PROMPT)} },
-    { role: 'user', content: 'Historial:\\n' + $json.history_text + '\\n\\nMensaje nuevo:\\n' + $('Preparar').first().json.question }],
+    { role: 'user', content: ${CONSULTA === 'en'
+    ? `($json.has_history ? 'Historial:\\n' + $json.history_text + '\\n\\n' : '') + 'Mensaje:\\n' + $('Preparar').first().json.question`
+    : `'Historial:\\n' + $json.history_text + '\\n\\nMensaje nuevo:\\n' + $('Preparar').first().json.question`} }],
   max_completion_tokens: 200
 }) }}`,
       options: { timeout: 30000 },
     },
       { credentials: openai, ...RETRY_LLM, onError: 'continueRegularOutput',
-        notes: 'Solo con historial: vuelve autónomo un seguimiento ("¿y en móvil?"). Si falla, se busca con la pregunta original.' }),
+        notes: CONSULTA === 'en'
+          ? 'Siempre: traduce la pregunta al inglés (idioma de la documentación) y resuelve los seguimientos con el historial. Si falla, se busca con la pregunta original.'
+          : 'Solo con historial: vuelve autónomo un seguimiento ("¿y en móvil?"). Si falla, se busca con la pregunta original.' }),
 
     node('r7', 'Consulta de búsqueda', 'n8n-nodes-base.code', 2, [1320, -120], {
       mode: 'runOnceForEachItem',
@@ -227,9 +242,9 @@ return { json: { ...base, search_query: rewriteResult(llmText($json), base.quest
 
     node('r9', 'Buscar fragmentos', 'n8n-nodes-base.postgres', 2.7, [1760, -120], {
       operation: 'executeQuery',
-      query: sqlExpr('sql/rag/02_buscar.sql', { __PARAMS_JSON__: 'JSON.stringify({ q: $json.embedding.values })' }),
+      query: sqlExpr('sql/rag/02_buscar.sql', { __PARAMS_JSON__: 'JSON.stringify({ q: $json.embedding.values })', __TOPK__: String(TOPK) }),
       options: {},
-    }, { credentials: pg, notes: 'Siempre 1 fila: chunks (top 6, JSON) + top_similarity (sql/rag/02_buscar.sql).' }),
+    }, { credentials: pg, notes: `Siempre 1 fila: chunks (top ${TOPK}, JSON) + top_similarity (sql/rag/02_buscar.sql).` }),
 
     node('r10', 'Armar prompt', 'n8n-nodes-base.code', 2, [1980, -120], {
       mode: 'runOnceForEachItem',
@@ -439,9 +454,14 @@ return r.parts.map((html) => ({ json: { chat_id: r.chat_id, html, plain: htmlToP
   link('Preparar', '¿Vacía?');
   link('¿Vacía?', 'Resultado', 0);
   link('¿Vacía?', 'Historial', 1);
-  link('Historial', '¿Hay historial?');
-  link('¿Hay historial?', 'Reescribir consulta', 0);
-  link('¿Hay historial?', 'Consulta de búsqueda', 1);
+  if (CONSULTA === 'en') {
+    // Siempre se traduce: el IF "¿Hay historial?" no hace falta.
+    link('Historial', 'Reescribir consulta');
+  } else {
+    link('Historial', '¿Hay historial?');
+    link('¿Hay historial?', 'Reescribir consulta', 0);
+    link('¿Hay historial?', 'Consulta de búsqueda', 1);
+  }
   link('Reescribir consulta', 'Consulta de búsqueda');
   link('Consulta de búsqueda', 'Embeber consulta');
   link('Embeber consulta', 'Buscar fragmentos');
@@ -469,7 +489,8 @@ return r.parts.map((html) => ({ json: { chat_id: r.chat_id, html, plain: htmlToP
   link('Repartir partes', 'Enviar');
   link('Enviar', 'Enviar plano', 1);
 
-  return { name: '[BS] Pregunta libre (RAG)', nodes, connections,
+  return { name: '[BS] Pregunta libre (RAG)',
+    nodes: CONSULTA === 'en' ? nodes.filter((n) => n.name !== '¿Hay historial?') : nodes, connections,
     settings: { executionOrder: 'v1', timezone: 'America/Lima' } };
 }
 
