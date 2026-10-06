@@ -180,6 +180,10 @@ const base = {
   // Solo en el eval: forzar un modelo ({ provider, model }) para comparar
   // modelos con los mismos fragmentos y el mismo prompt (Fase 6).
   force_model: $json.source === 'eval' && $json.force_model?.model ? $json.force_model : null,
+  // Solo en el eval: llamar al LLM aunque la similitud quede bajo el UMBRAL,
+  // para medir si el modelo mismo sabe decir "no está en la documentación"
+  // (en producción esas preguntas se cortan antes y todos los modelos empatan).
+  ignore_umbral: $json.source === 'eval' && $json.ignore_umbral === true,
   question,
   started_at: Date.now(),
 };
@@ -264,7 +268,7 @@ const retry = $json.attempt ? $json : null;
 const chain = base.force_model ? [base.force_model] : MODELS;
 const common = { ...base, top_similarity, chunk_ids: chunks.map((c) => c.id), similarities: chunks.map((c) => c.similarity) };
 
-if (!retry && top_similarity < UMBRAL) {
+if (!retry && top_similarity < UMBRAL && !base.ignore_umbral) {
   // Nada suficientemente parecido: se responde sin llamar al LLM.
   return { json: { ...common, done: true, outcome: 'no_context',
     parts: ['No está en la documentación de Bootstrap 5.3. Si es sobre Bootstrap, prueba a reformularla con el nombre del componente o la utilidad.'],

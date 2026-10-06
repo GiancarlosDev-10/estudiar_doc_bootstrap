@@ -1,0 +1,50 @@
+{
+  "descripcion": "Precios Standard por 1M de tokens (texto), consultados el 2026-10-05 en las páginas oficiales. Para Gemini se usa el precio de pago aunque el bot use el free tier, para comparar en igualdad de condiciones. Los Flash de Gemini suben de precio el 2027-01-01 (entre paréntesis).",
+  "fuentes": [
+    "https://developers.openai.com/api/docs/pricing",
+    "https://ai.google.dev/gemini-api/docs/pricing"
+  ],
+  "fecha": "2026-10-05",
+  "precios": {
+    "gpt-5.4-mini": {
+      "input": 0.75,
+      "output": 4.5
+    },
+    "gpt-5.4": {
+      "input": 2.5,
+      "output": 15
+    },
+    "gpt-5.5": {
+      "input": 5,
+      "output": 30
+    },
+    "gemini-3.7-flash": {
+      "input": 0.75,
+      "output": 3.75,
+      "nota": "1.50 / 7.50 desde 2027-01-01; tiene free tier"
+    },
+    "gemini-3.5-flash": {
+      "input": 1.5,
+      "output": 9,
+      "nota": "tiene free tier"
+    },
+    "gemini-3.8-flash": {
+      "input": 0.75,
+      "output": 3.75,
+      "nota": "1.50 / 7.50 desde 2027-01-01; tiene free tier"
+    },
+    "gemini-3.1-pro-preview": {
+      "input": 2,
+      "output": 12,
+      "nota": "sin free tier; prompts <= 200k tokens"
+    },
+    "gpt-4o-mini": {
+      "input": 0.15,
+      "output": 0.6
+    },
+    "gpt-5.4-nano": {
+      "input": 0.2,
+      "output": 1.25
+    }
+  }
+}

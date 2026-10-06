@@ -1,0 +1,166 @@
+{
+  "descripcion": "Fase 6: evaluación de modelos para la Pregunta libre (RAG). 20 preguntas en español, como las haría el usuario. 'esperada' = respuesta de referencia para el juez; 'debe' = puntos que la respuesta tiene que cubrir; 'no_debe' = lo que la invalida; 'fuentes' = URLs oficiales que deberían estar entre las citas (basta una). Las respuestas esperadas se comprobaron contra site/src/content/docs de twbs/bootstrap v5.3.8. Las preguntas 1-5 son el smoke de la Fase 3.",
+  "version_docs": "v5.3.8",
+  "preguntas": [
+    {
+      "id": 1, "tipo": "normal",
+      "pregunta": "¿Cómo centro un div horizontalmente?",
+      "esperada": "Con `mx-auto` en un elemento de bloque que tenga un ancho definido, o con flexbox en el padre: `d-flex justify-content-center`.",
+      "debe": ["mx-auto en un elemento de bloque con ancho definido", "o flexbox en el padre: d-flex + justify-content-center"],
+      "no_debe": ["center-block (Bootstrap 3)", "inventar clases que no existen"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering", "https://getbootstrap.com/docs/5.3/utilities/flex/#justify-content"]
+    },
+    {
+      "id": 2, "tipo": "normal",
+      "pregunta": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+      "esperada": "`.navbar` con `navbar-expand-{breakpoint}` (p. ej. `navbar-expand-lg`); un `.navbar-toggler` con `data-bs-toggle=\"collapse\"` y `data-bs-target` que apunta a `.collapse.navbar-collapse`; dentro, un `.nav-item.dropdown` con `.dropdown-toggle` (`data-bs-toggle=\"dropdown\"`) y `.dropdown-menu`.",
+      "debe": ["navbar-expand-{breakpoint} para decidir cuándo colapsa", "botón navbar-toggler con data-bs-toggle=\"collapse\" y data-bs-target hacia .collapse.navbar-collapse", "nav-item dropdown con dropdown-toggle, data-bs-toggle=\"dropdown\" y dropdown-menu", "un ejemplo de código HTML"],
+      "no_debe": ["data-toggle / data-target sin el prefijo bs (Bootstrap 4)"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/components/navbar/#supported-content", "https://getbootstrap.com/docs/5.3/components/navbar/#nav"]
+    },
+    {
+      "id": 3, "tipo": "normal",
+      "pregunta": "¿Cómo cambio el color primary?",
+      "esperada": "En Sass: sobrescribir `$primary` (o modificar el mapa `$theme-colors`) en tu propio archivo, después de importar `functions` y antes de importar `variables`, y recompilar.",
+      "debe": ["sobrescribir $primary (o el mapa $theme-colors) en Sass", "hacerlo después de importar functions y antes de importar variables"],
+      "no_debe": ["decir que basta con editar bootstrap.min.css"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/customize/sass/#variable-defaults", "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map", "https://getbootstrap.com/docs/5.3/customize/color/"]
+    },
+    {
+      "id": 4, "tipo": "trampa_v4",
+      "pregunta": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+      "esperada": "Son de Bootstrap 4. En 5.3 `ml-3` es `ms-3` (start, por el soporte RTL) y `data-toggle` es `data-bs-toggle` (los atributos data llevan el prefijo bs).",
+      "debe": ["aclarar que ml-3 y data-toggle son de Bootstrap 4", "en 5.3: ms-3 (start) en lugar de ml-3", "en 5.3: data-bs-toggle en lugar de data-toggle"],
+      "no_debe": ["dar ml-3 o data-toggle como válidos en 5.3"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/utilities/spacing/", "https://getbootstrap.com/docs/5.3/migration/"]
+    },
+    {
+      "id": 5, "tipo": "fuera",
+      "pregunta": "¿Cómo integro Bootstrap con Tailwind?",
+      "esperada": "No está en la documentación de Bootstrap 5.3.",
+      "debe": ["decir que no está en la documentación de Bootstrap 5.3", "no inventar una guía de integración"],
+      "no_debe": ["pasos de instalación de Tailwind", "citar URLs que no hablen del tema"],
+      "fuentes": []
+    },
+    {
+      "id": 6, "tipo": "normal",
+      "pregunta": "¿Cómo hago que una tabla sea responsive?",
+      "esperada": "Envolviendo la `.table` en un `<div class=\"table-responsive\">` (scroll horizontal), o con `.table-responsive{-sm|-md|-lg|-xl|-xxl}` para que solo haga scroll por debajo de ese breakpoint.",
+      "debe": ["envolver la tabla en un div con .table-responsive", "mencionar las variantes por breakpoint (.table-responsive-md, etc.)"],
+      "no_debe": ["clases inventadas como .table-mobile"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables"]
+    },
+    {
+      "id": 7, "tipo": "normal",
+      "pregunta": "¿Qué clases hay para el tamaño de los botones?",
+      "esperada": "`.btn-lg` y `.btn-sm`, junto con `.btn` y la variante de color. Para tamaños a medida se pueden usar variables CSS del botón.",
+      "debe": [".btn-lg y .btn-sm", "se combinan con .btn y una variante como .btn-primary"],
+      "no_debe": [".btn-xs (Bootstrap 3)", ".btn-block como clase de tamaño (eliminada en v5)"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/components/buttons/#sizes"]
+    },
+    {
+      "id": 8, "tipo": "normal",
+      "pregunta": "¿Cómo oculto un elemento solo en celulares?",
+      "esperada": "Con las utilidades de display responsive: `d-none d-sm-block` lo oculta solo en xs (menos de 576 px). Si \"celular\" incluye sm, `d-none d-md-block`.",
+      "debe": ["combinar d-none con d-{breakpoint}-block (p. ej. d-none d-sm-block o d-none d-md-block)", "explicar en qué ancho deja de estar oculto"],
+      "no_debe": ["hidden-xs / visible-xs (Bootstrap 3)", "d-xs-none (no existe)"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements"]
+    },
+    {
+      "id": 9, "tipo": "normal",
+      "pregunta": "¿Cómo activo el modo oscuro?",
+      "esperada": "Con el atributo `data-bs-theme=\"dark\"` en `<html>` para toda la página, o en un elemento concreto (p. ej. un `.dropdown` o una `.card`) para aplicarlo solo ahí. Para que siga la preferencia del sistema o tenga un botón para alternarlo hace falta JavaScript propio.",
+      "debe": ["data-bs-theme=\"dark\" en <html> (global)", "también se puede aplicar a un componente o elemento concreto"],
+      "no_debe": ["una clase .dark-mode o .theme-dark inventada"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/customize/color-modes/"]
+    },
+    {
+      "id": 10, "tipo": "normal",
+      "pregunta": "¿Cómo pongo dos columnas del mismo ancho?",
+      "esperada": "Dentro de un `.container` y un `.row`, dos `.col`: las columnas sin número se reparten el ancho por igual en todos los breakpoints.",
+      "debe": [".row con dos .col (sin número)", "explicar que se reparten el ancho por igual"],
+      "no_debe": ["col-xs-6 (Bootstrap 3)"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/layout/grid/#equal-width"]
+    },
+    {
+      "id": 11, "tipo": "normal",
+      "pregunta": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+      "esperada": "Agregar `novalidate` al `<form>` (para usar los mensajes propios en lugar de los del navegador) y, con JavaScript, añadir `.was-validated` al formulario al intentar enviarlo; los mensajes van en `.valid-feedback` / `.invalid-feedback`. Para validación del servidor, `.is-valid` / `.is-invalid` en cada campo.",
+      "debe": ["novalidate en el form", ".was-validated en el form al enviar (con JavaScript)", ".invalid-feedback / .valid-feedback para los mensajes", "o .is-invalid / .is-valid para validación del servidor"],
+      "no_debe": ["has-error / has-success (Bootstrap 3)"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/forms/validation/"]
+    },
+    {
+      "id": 12, "tipo": "normal",
+      "pregunta": "¿Cómo centro un modal verticalmente en la pantalla?",
+      "esperada": "Agregando `.modal-dialog-centered` al `.modal-dialog`.",
+      "debe": [".modal-dialog-centered en .modal-dialog"],
+      "no_debe": ["CSS a mano con position/transform como única solución"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered"]
+    },
+    {
+      "id": 13, "tipo": "normal",
+      "pregunta": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+      "esperada": "Los tooltips son opt-in por rendimiento: hay que inicializarlos con JavaScript, por ejemplo seleccionando todos los `[data-bs-toggle=\"tooltip\"]` y creando `new bootstrap.Tooltip(el)` para cada uno. Además dependen de Popper (incluido en `bootstrap.bundle`).",
+      "debe": ["los tooltips son opt-in: hay que inicializarlos con JavaScript", "ejemplo con new bootstrap.Tooltip(...)", "requieren Popper (bootstrap.bundle lo incluye)"],
+      "no_debe": ["decir que basta con el atributo data", "$().tooltip() con jQuery como forma recomendada"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/components/tooltips/"]
+    },
+    {
+      "id": 14, "tipo": "normal",
+      "pregunta": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+      "esperada": "Un contenedor `.form-floating` con el `<input class=\"form-control\">` y luego el `<label>` (el input va antes del label). El input necesita un `placeholder` no vacío, porque la etiqueta flotante depende de `:placeholder-shown`.",
+      "debe": [".form-floating envolviendo input + label", "el input va antes del label", "placeholder obligatorio (no vacío)"],
+      "no_debe": ["clases inventadas como .floating-label"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/forms/floating-labels/"]
+    },
+    {
+      "id": 15, "tipo": "trampa_v4",
+      "pregunta": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+      "esperada": "El componente jumbotron se eliminó en Bootstrap 5. Se replica con utilidades, por ejemplo un contenedor con `p-5 mb-4 bg-body-tertiary rounded-3`.",
+      "debe": ["aclarar que .jumbotron ya no existe en 5.3 (se eliminó en v5)", "replicarlo con utilidades de espaciado, fondo y bordes"],
+      "no_debe": ["usar la clase .jumbotron como válida"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/migration/"]
+    },
+    {
+      "id": 16, "tipo": "trampa_v4",
+      "pregunta": "¿Cómo uso form-group y custom-select en un formulario?",
+      "esperada": "Las dos son de Bootstrap 4. `.form-group` se eliminó: el espaciado se hace con utilidades (p. ej. `mb-3`) o con el grid. `.custom-select` ahora es `.form-select`.",
+      "debe": ["aclarar que son de Bootstrap 4", ".form-group eliminado: usar utilidades como mb-3 o el grid", ".custom-select pasó a ser .form-select"],
+      "no_debe": ["usar .form-group o .custom-select como válidos en 5.3"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/migration/", "https://getbootstrap.com/docs/5.3/forms/select/"]
+    },
+    {
+      "id": 17, "tipo": "trampa_v4",
+      "pregunta": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+      "esperada": "`.badge-pill` se eliminó: se usa la utilidad `.rounded-pill` (`badge rounded-pill text-bg-primary`). `.float-right` ahora es `.float-end`.",
+      "debe": ["badge-pill y float-right son de Bootstrap 4", "usar .rounded-pill en el badge", "usar .float-end en lugar de .float-right"],
+      "no_debe": ["usar .badge-pill o .float-right como válidos en 5.3"],
+      "fuentes": ["https://getbootstrap.com/docs/5.3/components/badge/#pill-badges", "https://getbootstrap.com/docs/5.3/utilities/float/", "https://getbootstrap.com/docs/5.3/migration/"]
+    },
+    {
+      "id": 18, "tipo": "fuera",
+      "pregunta": "¿Cómo hago un hook personalizado en React?",
+      "esperada": "No está en la documentación de Bootstrap 5.3.",
+      "debe": ["decir que no está en la documentación de Bootstrap 5.3"],
+      "no_debe": ["explicar cómo hacer un hook de React"],
+      "fuentes": []
+    },
+    {
+      "id": 19, "tipo": "fuera",
+      "pregunta": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+      "esperada": "No está en la documentación de Bootstrap 5.3 (pide CSS puro, sin Bootstrap). Como mucho puede mencionar cómo se hace con las clases de Bootstrap, aclarando que eso ya no es CSS puro.",
+      "debe": ["decir que CSS Grid puro no está en la documentación de Bootstrap 5.3"],
+      "no_debe": ["dar la receta de CSS Grid puro (display:grid; place-items:center) como si viniera de la documentación"],
+      "fuentes": []
+    },
+    {
+      "id": 20, "tipo": "fuera",
+      "pregunta": "¿Cómo configuro un modelo en Django?",
+      "esperada": "No está en la documentación de Bootstrap 5.3.",
+      "debe": ["decir que no está en la documentación de Bootstrap 5.3"],
+      "no_debe": ["explicar modelos de Django"],
+      "fuentes": []
+    }
+  ]
+}

@@ -1,0 +1,4530 @@
+{
+ "fecha": "2026-10-06",
+ "modelos": [
+  {
+   "provider": "openai",
+   "model": "gpt-5.4-mini"
+  },
+  {
+   "provider": "gemini",
+   "model": "gemini-3.7-flash"
+  },
+  {
+   "provider": "gemini",
+   "model": "gemini-3.5-flash"
+  }
+ ],
+ "jueces": {
+  "openai": "gpt-4o-mini",
+  "gemini": "gemini-3.8-flash"
+ },
+ "fragmentos_distintos_en": [],
+ "costo_jueces_usd": 0.03178874999999999,
+ "acuerdo_jueces": {
+  "pares": 8,
+  "diferencia_media": 0.375,
+  "iguales": 5
+ },
+ "resumen": [
+  {
+   "model": "gemini-3.5-flash",
+   "preguntas": 20,
+   "errores": 6,
+   "disponibilidad": {
+    "fallos": 6,
+    "intentos": 20
+   },
+   "nota_media": 3.425,
+   "nota_normal": 4.875,
+   "nota_trampa_v4": 1.25,
+   "nota_fuera": 1.25,
+   "correctas_2": 13,
+   "negativas_ok": 14,
+   "v4_en_codigo": 0,
+   "fuente_esperada": "11/13",
+   "latencia_p50_ms": 4613,
+   "latencia_p90_ms": 6859,
+   "costo_por_pregunta_usd": 0.0071672142857142854,
+   "tokens_salida_media": 330.2142857142857
+  },
+  {
+   "model": "gemini-3.7-flash",
+   "preguntas": 20,
+   "errores": 12,
+   "disponibilidad": {
+    "fallos": 12,
+    "intentos": 20
+   },
+   "nota_media": 1.875,
+   "nota_normal": 2.7083333333333335,
+   "nota_trampa_v4": 0,
+   "nota_fuera": 1.25,
+   "correctas_2": 6,
+   "negativas_ok": 8,
+   "v4_en_codigo": 0,
+   "fuente_esperada": "6/7",
+   "latencia_p50_ms": 6051,
+   "latencia_p90_ms": 8489,
+   "costo_por_pregunta_usd": 0.002936625,
+   "tokens_salida_media": 227.75
+  },
+  {
+   "model": "gpt-5.4-mini",
+   "preguntas": 20,
+   "errores": 0,
+   "disponibilidad": {
+    "fallos": 0,
+    "intentos": 20
+   },
+   "nota_media": 4.475,
+   "nota_normal": 4.541666666666667,
+   "nota_trampa_v4": 3.75,
+   "nota_fuera": 5,
+   "correctas_2": 15,
+   "negativas_ok": 20,
+   "v4_en_codigo": 0,
+   "fuente_esperada": "14/16",
+   "latencia_p50_ms": 2261,
+   "latencia_p90_ms": 3788,
+   "costo_por_pregunta_usd": 0.002568225,
+   "tokens_salida_media": 137.5
+  }
+ ],
+ "results": [
+  {
+   "id": 1,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo centro un div horizontalmente?",
+   "search_query": "¿Cómo centro un div horizontalmente?",
+   "top_similarity": 0.7195611145205156,
+   "similarities": [
+    0.7195611145205156,
+    0.6624072797762263,
+    0.6609919526064476,
+    0.6486159111905766,
+    0.6381978835930924,
+    0.6365395294923308
+   ],
+   "answer_md": "Para centrar un elemento horizontalmente en Bootstrap 5.3, dispones de varias opciones según el contexto y el tipo de contenedor que estés utilizando:\n\n**1. Centrado de bloques con ancho fijo**\nPuedes usar la clase `.mx-auto` para centrar horizontalmente contenido de nivel de bloque que tenga un ancho (`width`) definido y `display: block` [1]. Esto establece los márgenes horizontales automáticamente [1].\n\n```html\n<div class=\"mx-auto p-2\" style=\"width: 200px;\">\n  Centered element\n</div>\n```\n\n**2. Centrado en sistemas de columnas (Grid)**\nSi estás trabajando dentro de una fila (`.row`), puedes alinear las columnas horizontalmente usando las clases de distribución `justify-content-*` [3]. Para centrar, se utiliza la clase `justify-content-center` [3]:\n\n```html\n<div class=\"row justify-content-center\">\n  <div class=\"col-4\">\n    Contenido centrado\n  </div>\n</div>\n```\n\n**3. Centrado absoluto con posicionamiento**\nSi utilizas posicionamiento absoluto, puedes centrar un elemento horizontalmente combinando las utilidades de bordes con la clase `.translate-middle-x` [4]. Esta clase aplica la transformación `translateX(-50%)` para lograr un centrado preciso [4]:\n\n```html\n<div class=\"position-relative\">\n  <div class=\"position-absolute top-0 start-50 translate-middle-x\"></div>\n</div>\n```\n\n**4. Espaciadores en Stacks horizontales**\nSi utilizas un contenedor horizontal `.hstack`, puedes empujar elementos y crear alineaciones utilizando márgenes horizontales automáticos como `.ms-auto` [2].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#horizontal"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#horizontal",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#horizontal-form",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#containers"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2922,
+   "completion_tokens": 380,
+   "latency_ms": 5123,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde correctamente con `.mx-auto` en un bloque con ancho definido y también muestra un caso con `justify-content-center` en un contenedor flex de Bootstrap. Aunque añade alternativas extra y no da el ejemplo general `d-flex justify-content-center`, no contiene errores de fondo y es práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1085,
+     "completion": 604
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.007803,
+   "juez_cost_usd": 0.0005251499999999999,
+   "revisar": []
+  },
+  {
+   "id": 1,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo centro un div horizontalmente?",
+   "search_query": "¿Cómo centro un div horizontalmente?",
+   "top_similarity": 0.7195611145205156,
+   "similarities": [
+    0.7195611145205156,
+    0.6624072797762263,
+    0.6609919526064476,
+    0.6486159111905766,
+    0.6381978835930924,
+    0.6365395294923308
+   ],
+   "answer_md": "Existen varias formas de centrar un `<div>` horizontalmente según la técnica o el contexto que utilices:\n\n- **Contenido de bloque con ancho fijo:** Usa la clase `.mx-auto` en un elemento que tenga `display: block` y un ancho definido (`width`), lo que establece los márgenes horizontales en `auto` [1].\n- **Sistema de columnas (grid):** En un contenedor con la clase `.row`, puedes alinear horizontalmente las columnas usando clases como `.justify-content-center` [3].\n- **Posicionamiento absoluto:** Puedes centrar elementos combinando utilidades de posición como `.position-absolute` y `.start-50` junto con `.translate-middle-x` (para centrado horizontal) o `.translate-middle` (para centrado absoluto tanto vertical como horizontal) [4].\n\n**Ejemplo con `.mx-auto`:**\n\n```html\n<div class=\"mx-auto p-2\" style=\"width: 200px;\">\n  Centered element\n</div>\n```\n\n**Ejemplo con `.justify-content-center` en el grid:**\n\n```html\n<div class=\"row justify-content-center\">\n  <div class=\"col-4\">\n    One of two columns\n  </div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#horizontal",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#horizontal-form",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#containers"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2922,
+   "completion_tokens": 276,
+   "latency_ms": 8489,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "La respuesta da correctamente la opción principal con `mx-auto` y ancho definido, pero no cubre la alternativa esencial de flexbox en el padre con `d-flex justify-content-center`. No contiene clases inventadas ni sintaxis obsoleta, y los ejemplos son prácticos."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 983,
+     "completion": 533
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 4,
+   "cost_usd": 0.0032265,
+   "juez_cost_usd": 0.00046725,
+   "revisar": []
+  },
+  {
+   "id": 1,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo centro un div horizontalmente?",
+   "search_query": "¿Cómo centro un div horizontalmente?",
+   "top_similarity": 0.7195611145205156,
+   "similarities": [
+    0.7195611145205156,
+    0.6624072797762263,
+    0.6609919526064476,
+    0.6486159111905766,
+    0.6381978835930924,
+    0.6365395294923308
+   ],
+   "answer_md": "Puedes centrar un `div` horizontalmente con la clase `.mx-auto` [1].\n\n- Esa clase se usa para centrar contenido en bloque con ancho fijo, es decir, que tenga `display: block` y un `width` definido, poniendo los márgenes horizontales en `auto` [1].\n- En el ejemplo de la documentación se usa así: [1]\n\n```html\n<div class=\"mx-auto p-2\" style=\"width: 200px;\">\n  Centered element\n</div>\n```\n\nSi quieres, también puedo mostrarte cómo hacerlo con `hstack` o con `justify-content-*` según el contexto [2][3].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#horizontal",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#horizontal",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#horizontal-form",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#containers"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2727,
+   "completion_tokens": 140,
+   "latency_ms": 2021,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde correctamente con `mx-auto` y aclara que el elemento debe tener ancho definido, incluyendo un ejemplo práctico. No da el ejemplo completo con `d-flex justify-content-center`, pero para la pregunta basta con el método principal válido."
+    },
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Explica con precisión el uso de mx-auto con ancho definido e incluye un ejemplo de código claro y conciso."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 863,
+     "completion": 292
+    },
+    {
+     "prompt": 847,
+     "completion": 224
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 5,
+   "cost_usd": 0.00267525,
+   "juez_cost_usd": 0.0017799,
+   "revisar": []
+  },
+  {
+   "id": 2,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "search_query": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "top_similarity": 0.7200420951731508,
+   "similarities": [
+    0.7200420951731508,
+    0.714253242516573,
+    0.7016179374122075,
+    0.7013966178349733,
+    0.6943542345401628,
+    0.6938437539805713
+   ],
+   "answer_md": "Para crear un navbar que se colapse en dispositivos móviles y contenga un menú desplegable (dropdown), debes estructurar tu HTML utilizando las clases de Bootstrap 5.3 diseñadas para este propósito.\n\nLos navbars requieren un contenedor principal con la clase `.navbar` y una clase de expansión como `.navbar-expand-lg` para determinar el punto de interrupción (breakpoint) en el que el contenido deja de estar colapsado [3]. Para que el menú se colapse detrás de un botón en pantallas móviles, se utilizan las clases `.navbar-toggler` para el botón de alternancia, y `.collapse.navbar-collapse` para agrupar el contenido que se va a ocultar [2][4].\n\nDentro del menú, puedes añadir un dropdown envolviendo el enlace activador y el menú desplegable en un elemento con la clase `.nav-item.dropdown` [4]. El activador del dropdown debe llevar el atributo `data-bs-toggle=\"dropdown\"` para que funcione el plugin de JavaScript [4][6].\n\nAquí tienes un ejemplo práctico de un navbar responsivo que se colapsa en pantallas pequeñas (utilizando el breakpoint `lg`) y que incluye un dropdown [4]:\n\n```html\n<nav class=\"navbar navbar-expand-lg bg-body-tertiary\">\n  <div class=\"container-fluid\">\n    <a class=\"navbar-brand\" href=\"#\">Navbar</a>\n    <button class=\"navbar-toggler\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#navbarSupportedContent\" aria-controls=\"navbarSupportedContent\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">\n      <span class=\"navbar-toggler-icon\"></span>\n    </button>\n    <div class=\"collapse navbar-collapse\" id=\"navbarSupportedContent\">\n      <ul class=\"navbar-nav me-auto mb-2 mb-lg-0\">\n        <li class=\"nav-item\">\n          <a class=\"nav-link active\" aria-current=\"page\" href=\"#\">Home</a>\n        </li>\n        <li class=\"nav-item dropdown\">\n          <a class=\"nav-link dropdown-toggle\" href=\"#\" role=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">\n            Dropdown\n          </a>\n          <ul class=\"dropdown-menu\">\n            <li><a class=\"dropdown-item\" href=\"#\">Action</a></li>\n            <li><a class=\"dropdown-item\" href=\"#\">Another action</a></li>\n            <li><hr class=\"dropdown-divider\"></li>\n            <li><a class=\"dropdown-item\" href=\"#\">Something else here</a></li>\n          </ul>\n        </li>\n      </ul>\n    </div>\n  </div>\n</nav>\n```\n\nTen en cuenta que en dispositivos iOS, debido a la complejidad de la propiedad `z-index`, no se utiliza el elemento `.dropdown-backdrop` en la barra de navegación [1]. Por lo tanto, para cerrar un dropdown en iOS, debes hacer clic directamente en el elemento del dropdown o en cualquier otro elemento que dispare un evento de clic [1].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/navs-tabs/#using-dropdowns",
+    "https://getbootstrap.com/docs/5.3/getting-started/browsers-devices/#navbar-dropdowns"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/browsers-devices/#navbar-dropdowns",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#examples",
+    "https://getbootstrap.com/docs/5.3/components/navs-tabs/#using-dropdowns"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2552,
+   "completion_tokens": 653,
+   "latency_ms": 6036,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 1,
+     "util": 1,
+     "total": 4,
+     "motivo": "Cubre todos los elementos esenciales: `navbar-expand-lg`, botón `navbar-toggler` con `data-bs-toggle`/`data-bs-target`, contenedor `.collapse.navbar-collapse` y dropdown con `data-bs-toggle=\"dropdown\"`, además de un ejemplo completo. La nota final sobre iOS y `.dropdown-backdrop` es irrelevante y algo dudosa en Bootstrap 5.3, aunque no afecta al ejemplo principal."
+    },
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre todos los puntos requeridos con precisión, utiliza la sintaxis correcta de Bootstrap 5.3 y aporta un ejemplo de código completo y claro."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1438,
+     "completion": 633
+    },
+    {
+     "prompt": 1460,
+     "completion": 394
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 4.5,
+   "cost_usd": 0.009705,
+   "juez_cost_usd": 0.0031680000000000002,
+   "revisar": []
+  },
+  {
+   "id": 2,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "search_query": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "top_similarity": 0.7200420951731508,
+   "similarities": [
+    0.7200420951731508,
+    0.714253242516573,
+    0.7016179374122075,
+    0.7013966178349733,
+    0.6943542345401628,
+    0.6938437539805713
+   ],
+   "answer_md": "Para crear un navbar responsivo que se colapse detrás de un botón y contenga un menú desplegable, necesitas combinar los componentes de navegación y colapso de Bootstrap 5.3 [2][4]:\n\n- Usa un contenedor `<nav>` con la clase `.navbar` y una variante responsive como `.navbar-expand-lg` (o el breakpoint deseado como `-sm`, `-md`, `-xl`, `-xxl`) [2][3].\n- Agrega un botón con la clase `.navbar-toggler` y los atributos `data-bs-toggle=\"collapse\"` y `data-bs-target=\"#idDelMenu\"` [4].\n- Envuelve el contenido que se va a ocultar dentro de un contenedor con las clases `.collapse.navbar-collapse` asignándole el mismo `id` que especificaste en el botón [4].\n- Dentro de la lista `.navbar-nav`, agrega un elemento `.nav-item.dropdown` junto con un enlace `.nav-link.dropdown-toggle` (con el atributo `data-bs-toggle=\"dropdown\"`) y su respectivo menú `.dropdown-menu` [4][5].\n\nEjemplo de implementación [4]:\n\n```html\n<nav class=\"navbar navbar-expand-lg bg-body-tertiary\">\n  <div class=\"container-fluid\">\n    <a class=\"navbar-brand\" href=\"#\">Navbar</a>\n    <button class=\"navbar-toggler\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#navbarSupportedContent\" aria-controls=\"navbarSupportedContent\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">\n      <span class=\"navbar-toggler-icon\"></span>\n    </button>\n    <div class=\"collapse navbar-collapse\" id=\"navbarSupportedContent\">\n      <ul class=\"navbar-nav me-auto mb-2 mb-lg-0\">\n        <li class=\"nav-item\">\n          <a class=\"nav-link active\" aria-current=\"page\" href=\"#\">Home</a>\n        </li>\n        <li class=\"nav-item dropdown\">\n          <a class=\"nav-link dropdown-toggle\" href=\"#\" role=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">\n            Dropdown\n          </a>\n          <ul class=\"dropdown-menu\">\n            <li><a class=\"dropdown-item\" href=\"#\">Action</a></li>\n            <li><a class=\"dropdown-item\" href=\"#\">Another action</a></li>\n            <li><hr class=\"dropdown-divider\"></li>\n            <li><a class=\"dropdown-item\" href=\"#\">Something else here</a></li>\n          </ul>\n        </li>\n      </ul>\n    </div>\n  </div>\n</nav>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#examples"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/browsers-devices/#navbar-dropdowns",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#examples",
+    "https://getbootstrap.com/docs/5.3/components/navs-tabs/#using-dropdowns"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2552,
+   "completion_tokens": 578,
+   "latency_ms": 5197,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre todos los puntos esenciales: usa navbar-expand para el breakpoint, navbar-toggler con data-bs-toggle/data-bs-target, collapse navbar-collapse y dropdown con data-bs-toggle=\"dropdown\" y dropdown-menu. El ejemplo HTML es correcto para Bootstrap 5.3 y no usa sintaxis de Bootstrap 4."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1351,
+     "completion": 88
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0040815,
+   "juez_cost_usd": 0.00025545,
+   "revisar": []
+  },
+  {
+   "id": 2,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "search_query": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "top_similarity": 0.7200420951731508,
+   "similarities": [
+    0.7200420951731508,
+    0.714253242516573,
+    0.7016179374122075,
+    0.7013966178349733,
+    0.6943542345401628,
+    0.6938437539805713
+   ],
+   "answer_md": "Puedes hacerlo con una `.navbar` que use `.navbar-expand{-sm|-md|-lg|-xl|-xxl}` para el colapso responsive, junto con `.navbar-toggler` y `.collapse.navbar-collapse` para ocultar/mostrar el contenido [2][3][4].\n\nPara el dropdown dentro del navbar, usa un elemento con `.nav-item dropdown` y el toggle con `data-bs-toggle=\"dropdown\"` y `.dropdown-menu` [4][6]. En móvil, la nota para dropdowns en navbars dice que en iOS no se usa `.dropdown-backdrop`, así que para cerrarlos debes hacer clic directamente en el elemento del dropdown o en otro elemento que dispare un click en iOS [1].\n\n```html\n<nav class=\"navbar navbar-expand-lg bg-body-tertiary\">\n  <div class=\"container-fluid\">\n    <a class=\"navbar-brand\" href=\"#\">Navbar</a>\n    <button class=\"navbar-toggler\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#navbarContent\" aria-controls=\"navbarContent\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">\n      <span class=\"navbar-toggler-icon\"></span>\n    </button>\n\n    <div class=\"collapse navbar-collapse\" id=\"navbarContent\">\n      <ul class=\"navbar-nav me-auto mb-2 mb-lg-0\">\n        <li class=\"nav-item dropdown\">\n          <a class=\"nav-link dropdown-toggle\" href=\"#\" role=\"button\" data-bs-toggle=\"dropdown\" aria-expanded=\"false\">\n            Dropdown\n          </a>\n          <ul class=\"dropdown-menu\">\n            <li><a class=\"dropdown-item\" href=\"#\">Action</a></li>\n            <li><a class=\"dropdown-item\" href=\"#\">Another action</a></li>\n          </ul>\n        </li>\n      </ul>\n    </div>\n  </div>\n</nav>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/navs-tabs/#using-dropdowns",
+    "https://getbootstrap.com/docs/5.3/getting-started/browsers-devices/#navbar-dropdowns"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/browsers-devices/#navbar-dropdowns",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#examples",
+    "https://getbootstrap.com/docs/5.3/components/navs-tabs/#using-dropdowns"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2410,
+   "completion_tokens": 389,
+   "latency_ms": 3788,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 1,
+     "util": 1,
+     "total": 4,
+     "motivo": "Cubre los elementos esenciales: `navbar-expand-{breakpoint}`, toggler con `data-bs-toggle=\"collapse\"` y `data-bs-target`, `.collapse.navbar-collapse`, y dropdown con `data-bs-toggle=\"dropdown\"`, además de un ejemplo correcto. La nota sobre iOS/`.dropdown-backdrop` es innecesaria y algo imprecisa respecto a Bootstrap 5.3, pero no afecta al código principal."
+    },
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cumple perfectamente con todos los puntos requeridos, utiliza la sintaxis correcta de Bootstrap 5.3 e incluye un ejemplo de código completo y funcional."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1200,
+     "completion": 505
+    },
+    {
+     "prompt": 1227,
+     "completion": 322
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 4.5,
+   "cost_usd": 0.003558,
+   "juez_cost_usd": 0.00261075,
+   "revisar": []
+  },
+  {
+   "id": 3,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo cambio el color primary?",
+   "search_query": "¿Cómo cambio el color primary?",
+   "top_similarity": 0.7446582431340633,
+   "similarities": [
+    0.7446582431340633,
+    0.7094911566627383,
+    0.6973720483101166,
+    0.696002250195052,
+    0.6928265235089599,
+    0.6902911378341574
+   ],
+   "answer_md": "Para cambiar el color `primary` en Bootstrap 5.3, debes modificar su variable Sass independiente y luego actualizar el mapa `$theme-colors` en tu archivo Sass personalizado [1]. \n\nTodas las variables del mapa `$theme-colors` se definen primero como variables independientes [1]. Para modificar el color `primary`, añade lo siguiente a tu archivo Sass personalizado antes de que se genere el mapa [1]:\n\n```scss\n$primary: #0074d9; // Tu nuevo color personalizado\n```\n\nPosteriormente, estas variables se asignan en el mapa `$theme-colors` de Bootstrap [1]:\n\n```scss\n$theme-colors: (\n  \"primary\": $primary,\n  \"danger\": $danger\n);\n```\n\nPor defecto, la variable `$primary` está asociada al color `$blue` (`#0d6efd`) [6], y se utiliza para generar clases de utilidad, variables CSS (como `--bs-primary`) [3][4] y otros estilos del tema [2][3]. Al modificar esta variable en Sass, todos los componentes y utilidades que dependan de ella se actualizarán automáticamente.",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color/",
+    "https://getbootstrap.com/docs/5.3/customize/color/#using-the-new-colors",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors",
+    "https://getbootstrap.com/docs/5.3/customize/color/",
+    "https://getbootstrap.com/docs/5.3/customize/color/#using-the-new-colors",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#example",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3473,
+   "completion_tokens": 242,
+   "latency_ms": 7176,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "Indica correctamente que se cambia sobrescribiendo `$primary` en Sass, pero no cubre el orden esencial: importar `functions` antes y hacer la sobrescritura antes de importar `variables`. No contiene el error de recomendar editar `bootstrap.min.css`."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 963,
+     "completion": 454
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 4,
+   "cost_usd": 0.0073875,
+   "juez_cost_usd": 0.00041684999999999997,
+   "revisar": []
+  },
+  {
+   "id": 3,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo cambio el color primary?",
+   "search_query": "¿Cómo cambio el color primary?",
+   "top_similarity": 0.7446582431340633,
+   "similarities": [
+    0.7446582431340633,
+    0.7094911566627383,
+    0.6973720483101166,
+    0.696002250195052,
+    0.6928265235089599,
+    0.6902911378341574
+   ],
+   "answer_md": "Para modificar un color existente en el mapa `$theme-colors`, como `primary`, debes redefinir su variable individual en tu archivo Sass personalizado [1]. Todas las variables del mapa `$theme-colors` están definidas como variables independientes [1].\n\nPor defecto, `$primary` toma el valor de `$blue` [6]. Para cambiarlo, añade tu nuevo valor antes de que se establezca en el mapa de Bootstrap [1]:\n\n```scss\n$primary: #0074d9;\n```\n\nLuego, estas variables se asignan al mapa `$theme-colors` [1]:\n\n```scss\n$theme-colors: (\n  \"primary\": $primary,\n  \"danger\": $danger\n);\n```\n\nEste color también se refleja en las variables CSS asociadas, como `--bs-primary` y `--bs-primary-rgb` [3].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color/"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors",
+    "https://getbootstrap.com/docs/5.3/customize/color/",
+    "https://getbootstrap.com/docs/5.3/customize/color/#using-the-new-colors",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#example",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3473,
+   "completion_tokens": 183,
+   "latency_ms": 6051,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 1,
+     "util": 1,
+     "total": 3,
+     "motivo": "Indica correctamente que se debe redefinir `$primary` en Sass, pero omite el orden esencial de imports: después de `functions` y antes de `variables`. Además, el ejemplo del mapa `$theme-colors` es incompleto y puede confundir si se copia como override."
+    },
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "Explica correctamente cómo redefinir la variable $primary en Sass, pero omite el orden de importación clave (después de 'functions' y antes de 'variables')."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 904,
+     "completion": 590
+    },
+    {
+     "prompt": 884,
+     "completion": 347
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 3.5,
+   "cost_usd": 0.003291,
+   "juez_cost_usd": 0.0024538499999999996,
+   "revisar": []
+  },
+  {
+   "id": 3,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo cambio el color primary?",
+   "search_query": "¿Cómo cambio el color primary?",
+   "top_similarity": 0.7446582431340633,
+   "similarities": [
+    0.7446582431340633,
+    0.7094911566627383,
+    0.6973720483101166,
+    0.696002250195052,
+    0.6928265235089599,
+    0.6902911378341574
+   ],
+   "answer_md": "Puedes cambiar `primary` modificando la variable Sass `$primary` en tu archivo Sass personalizado [1][6]:\n\n```scss\n$primary: #0074d9;\n```\n\nLuego Bootstrap usa esa variable dentro de su mapa `$theme-colors` como `\"primary\": $primary` [1], y `primary` forma parte de los colores del mapa `$theme-colors` [2].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors",
+    "https://getbootstrap.com/docs/5.3/customize/color/",
+    "https://getbootstrap.com/docs/5.3/customize/color/#using-the-new-colors",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#example",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3182,
+   "completion_tokens": 83,
+   "latency_ms": 2591,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "Indica correctamente que se cambia sobrescribiendo la variable Sass `$primary` y muestra un ejemplo. Le falta un punto esencial: hacerlo tras importar `functions` y antes de importar `variables` para que Bootstrap lo tome al recompilar."
+    },
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "Explica correctamente cómo sobrescribir la variable Sass $primary, pero omite indicar el orden de importación crítico (después de functions y antes de variables)."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 810,
+     "completion": 178
+    },
+    {
+     "prompt": 785,
+     "completion": 259
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 4,
+   "cost_usd": 0.00276,
+   "juez_cost_usd": 0.0017883,
+   "revisar": []
+  },
+  {
+   "id": 4,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "search_query": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "top_similarity": 0.7187984678985558,
+   "similarities": [
+    0.7187984678985558,
+    0.7136689080610137,
+    0.7037985347502451,
+    0.7006569064555338,
+    0.6983985531797838,
+    0.6957183584162866
+   ],
+   "answer_md": "En Bootstrap 5.3, las clases y atributos que mencionas pertenecen a la sintaxis de Bootstrap 4 y han cambiado debido a la adopción de propiedades lógicas para el soporte RTL (derecha a izquierda) [5] y la incorporación del espacio de nombres `data-bs-*` en JavaScript.\n\nA continuación te explico cómo debes adaptarlos:\n\n- **De `ml-3` a `ms-3`**: Se han renombrado las clases direccionales para adoptar un enfoque de propiedades lógicas [5]. En lugar de usar `margin-left` con `ml-3`, debes utilizar `ms-3` (donde la `s` representa *start*) [5].\n- **De `data-toggle` a `data-bs-toggle`**: Para evitar conflictos con otros frameworks, todos los atributos de datos para complementos de JavaScript ahora incluyen el espacio de nombres `bs` [3]. Por ejemplo, para un colapsable debes usar `data-bs-toggle=\"collapse\"` [3].\n\nAquí tienes un ejemplo de cómo se aplican estos equivalentes en Bootstrap 5.3:\n\n```html\n<!-- Ejemplo de un botón que controla un colapsable usando la sintaxis de 5.3 -->\n<button \n  class=\"btn btn-primary ms-3\" \n  type=\"button\" \n  data-bs-toggle=\"collapse\" \n  data-bs-target=\"#miColapsable\">\n  Alternar contenido\n</button>\n\n<div class=\"collapse\" id=\"miColapsable\">\n  <div class=\"card card-body\">\n    Contenido colapsable.\n  </div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#approach",
+    "https://getbootstrap.com/docs/5.3/components/collapse/#via-data-attributes"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/components/collapse/#via-data-attributes",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#approach",
+    "https://getbootstrap.com/docs/5.3/migration/#utilities-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3502,
+   "completion_tokens": 358,
+   "latency_ms": 6038,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": false
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Aclara correctamente que `ml-3` y `data-toggle` son de Bootstrap 4 y da los equivalentes de Bootstrap 5.3: `ms-3` y `data-bs-toggle`. No presenta la sintaxis antigua como válida y añade un ejemplo práctico adecuado."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1121,
+     "completion": 84
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.008475,
+   "juez_cost_usd": 0.00021855,
+   "revisar": []
+  },
+  {
+   "id": 4,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "search_query": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "top_similarity": 0.7187984678985558,
+   "similarities": [
+    0.7187984678985558,
+    0.7136689080610137,
+    0.7037985347502451,
+    0.7006569064555338,
+    0.6983985531797838,
+    0.6957183584162866
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/components/collapse/#via-data-attributes",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#approach",
+    "https://getbootstrap.com/docs/5.3/migration/#utilities-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 2422,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 125
+    },
+    {
+     "prompt": 572,
+     "completion": 127
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.0010728,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 4,
+   "tipo": "trampa_v4",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "search_query": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "top_similarity": 0.7187984678985558,
+   "similarities": [
+    0.7187984678985558,
+    0.7136689080610137,
+    0.7037985347502451,
+    0.7006569064555338,
+    0.6983985531797838,
+    0.6957183584162866
+   ],
+   "answer_md": "`ml-3` es sintaxis de Bootstrap 4; en Bootstrap 5.3 se usa `.ms-3` para `margin-left` por el enfoque RTL [5].\n\n`data-toggle` también es sintaxis de Bootstrap 4; en Bootstrap 5.3 se reemplaza por `data-bs-toggle` [3]. Si además estabas controlando un `collapse`, la documentación indica usar `data-bs-toggle=\"collapse\"` junto con `data-bs-target`, y añadir la clase `collapse` al elemento colapsable [3].\n\n```html\n<div class=\"ms-3\">\n  <button type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#demo\">\n    Toggle\n  </button>\n  <div id=\"demo\" class=\"collapse\">Contenido</div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#approach",
+    "https://getbootstrap.com/docs/5.3/components/collapse/#via-data-attributes"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/components/collapse/#via-data-attributes",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#approach",
+    "https://getbootstrap.com/docs/5.3/migration/#utilities-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3222,
+   "completion_tokens": 170,
+   "latency_ms": 2786,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": false
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Aclara correctamente que `ml-3` y `data-toggle` son de Bootstrap 4 y da los equivalentes de Bootstrap 5.3: `.ms-3` y `data-bs-toggle`. El ejemplo práctico usa la sintaxis correcta de Bootstrap 5.3."
+    },
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Aclara con precisión que ambas sintaxis son de Bootstrap 4, proporciona sus equivalentes en 5.3 (ms-3 y data-bs-toggle) e incluye un ejemplo práctico."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 951,
+     "completion": 400
+    },
+    {
+     "prompt": 943,
+     "completion": 374
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 5,
+   "cost_usd": 0.0031815,
+   "juez_cost_usd": 0.0024924,
+   "revisar": []
+  },
+  {
+   "id": 5,
+   "tipo": "fuera",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "no_context",
+   "question": "¿Cómo integro Bootstrap con Tailwind?",
+   "search_query": "¿Cómo integro Bootstrap con Tailwind?",
+   "top_similarity": 0.6621198029675892,
+   "similarities": [
+    0.6621198029675892,
+    0.6620423135729366,
+    0.6590902568266057,
+    0.6590023209765571,
+    0.6547486891963439,
+    0.6469458165282623
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#usage-with-javascript-frameworks",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#ltr-and-rtl-at-the-same-time",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/#import-bootstrap",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3876,
+   "completion_tokens": 13,
+   "latency_ms": 2081,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta indica claramente que el tema no está cubierto por la documentación de Bootstrap 5.3 y no inventa pasos de integración con Tailwind. Es breve y adecuada para una pregunta fuera de alcance."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 720,
+     "completion": 69
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.005931,
+   "juez_cost_usd": 0.0001494,
+   "revisar": []
+  },
+  {
+   "id": 5,
+   "tipo": "fuera",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "no_context",
+   "question": "¿Cómo integro Bootstrap con Tailwind?",
+   "search_query": "¿Cómo integro Bootstrap con Tailwind?",
+   "top_similarity": 0.6621198029675892,
+   "similarities": [
+    0.6621198029675892,
+    0.6620423135729366,
+    0.6590902568266057,
+    0.6590023209765571,
+    0.6547486891963439,
+    0.6469458165282623
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#usage-with-javascript-frameworks",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#ltr-and-rtl-at-the-same-time",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/#import-bootstrap",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3876,
+   "completion_tokens": 13,
+   "latency_ms": 7770,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta identifica correctamente que la integración con Tailwind no está cubierta por la documentación de Bootstrap 5.3 y no inventa pasos ni guías externas. Es breve y útil para una pregunta fuera de alcance."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 720,
+     "completion": 70
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00295575,
+   "juez_cost_usd": 0.00015,
+   "revisar": []
+  },
+  {
+   "id": 5,
+   "tipo": "fuera",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo integro Bootstrap con Tailwind?",
+   "search_query": "¿Cómo integro Bootstrap con Tailwind?",
+   "top_similarity": 0.6621198029675892,
+   "similarities": [
+    0.6621198029675892,
+    0.6620423135729366,
+    0.6590902568266057,
+    0.6590023209765571,
+    0.6547486891963439,
+    0.6469458165282623
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#usage-with-javascript-frameworks",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#ltr-and-rtl-at-the-same-time",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/#import-bootstrap",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3559,
+   "completion_tokens": 16,
+   "latency_ms": 1253,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta identifica correctamente que la integración con Tailwind no está cubierta por la documentación de Bootstrap 5.3 y no inventa pasos de integración. Es breve y adecuada para una pregunta fuera de alcance."
+    },
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde de forma clara y concisa indicando que el tema no forma parte de la documentación de Bootstrap 5.3, sin dar pasos innecesarios sobre Tailwind."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 720,
+     "completion": 108
+    },
+    {
+     "prompt": 685,
+     "completion": 267
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 5,
+   "cost_usd": 0.00274125,
+   "juez_cost_usd": 0.0016878000000000002,
+   "revisar": []
+  },
+  {
+   "id": 6,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo hago que una tabla sea responsive?",
+   "search_query": "¿Cómo hago que una tabla sea responsive?",
+   "top_similarity": 0.7700501039699863,
+   "similarities": [
+    0.7700501039699863,
+    0.7451452075421401,
+    0.682462791131216,
+    0.6684117114879607,
+    0.6587966456044999,
+    0.6548271722319144
+   ],
+   "answer_md": "Para hacer que una tabla sea responsive y se pueda desplazar horizontalmente con facilidad, debes envolver la tabla que tiene la clase `.table` dentro de un contenedor con la clase `.table-responsive` [1]. Esto aplicará un comportamiento responsive en todos los breakpoints [2].\n\nSi prefieres que la tabla sea responsive solo hasta un breakpoint específico, puedes usar las clases `.table-responsive{-sm|-md|-lg|-xl|-xxl}` en el contenedor [1]. A partir de ese breakpoint en adelante, la tabla se comportará con normalidad y no se desplazará horizontalmente [2].\n\nTen en cuenta que las tablas responsive usan `overflow-y: hidden`, lo que recorta cualquier contenido que sobresalga de los bordes superior o inferior de la tabla, como los menús desplegables u otros widgets de terceros [1].\n\nAquí tienes un ejemplo de cómo estructurar una tabla para que sea siempre responsive [2]:\n\n```html\n<div class=\"table-responsive\">\n  <table class=\"table\">\n    <thead>\n      <tr>\n        <th>Cabecera</th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr>\n        <td>Celda</td>\n      </tr>\n    </tbody>\n  </table>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive",
+    "https://getbootstrap.com/docs/5.3/content/tables/#small-tables",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#responsive",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#stacked-to-horizontal",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#tables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1912,
+   "completion_tokens": 259,
+   "latency_ms": 2436,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre exactamente que la `.table` debe envolverse en un contenedor `.table-responsive` y menciona las variantes por breakpoint. No incluye clases inventadas ni errores sobre Bootstrap 5.3, y aporta un ejemplo práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1002,
+     "completion": 194
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.005199,
+   "juez_cost_usd": 0.0002667,
+   "revisar": []
+  },
+  {
+   "id": 6,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo hago que una tabla sea responsive?",
+   "search_query": "¿Cómo hago que una tabla sea responsive?",
+   "top_similarity": 0.7700501039699863,
+   "similarities": [
+    0.7700501039699863,
+    0.7451452075421401,
+    0.682462791131216,
+    0.6684117114879607,
+    0.6587966456044999,
+    0.6548271722319144
+   ],
+   "answer_md": "Para hacer que una tabla sea responsive y permita el desplazamiento horizontal, debes envolver cualquier elemento con la clase `.table` dentro de un contenedor con la clase `.table-responsive` [1][2].\n\nSi deseas que la tabla sea responsive solo hasta un punto de interrupción (*breakpoint*) específico, puedes usar clases de la forma `.table-responsive{-sm|-md|-lg|-xl|-xxl}` [1][2]. A partir de ese punto de interrupción en adelante, la tabla se comportará con normalidad y no tendrá desplazamiento horizontal [2].\n\nTen en cuenta que las tablas responsive utilizan `overflow-y: hidden`, lo cual recorta cualquier contenido que sobrepase los bordes superior o inferior (como menús desplegables) [1].\n\nEjemplo para hacer que una tabla sea siempre responsive [2]:\n\n```html\n<div class=\"table-responsive\">\n  <table class=\"table\">\n    ...\n  </table>\n</div>\n```\n\nTambién puedes aplicar puntos de interrupción específicos envolviendo la tabla en `.table-responsive-sm`, `.table-responsive-md`, `.table-responsive-lg`, `.table-responsive-xl` o `.table-responsive-xxl` [2].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive",
+    "https://getbootstrap.com/docs/5.3/content/tables/#small-tables",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#responsive",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#stacked-to-horizontal",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#tables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1912,
+   "completion_tokens": 255,
+   "latency_ms": 3505,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre exactamente que la tabla `.table` se envuelve en un `div.table-responsive` y menciona las variantes por breakpoint. No contiene clases inventadas ni errores sobre Bootstrap 5.3, y aporta un ejemplo práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 976,
+     "completion": 74
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00239025,
+   "juez_cost_usd": 0.0001908,
+   "revisar": []
+  },
+  {
+   "id": 6,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo hago que una tabla sea responsive?",
+   "search_query": "¿Cómo hago que una tabla sea responsive?",
+   "top_similarity": 0.7700501039699863,
+   "similarities": [
+    0.7700501039699863,
+    0.7451452075421401,
+    0.682462791131216,
+    0.6684117114879607,
+    0.6587966456044999,
+    0.6548271722319144
+   ],
+   "answer_md": "Hazla responsive envolviendo la `.table` con `.table-responsive` [1][2].\n\n```html\n<div class=\"table-responsive\">\n  <table class=\"table\">\n    ...\n  </table>\n</div>\n```\n\nSi quieres limitarlo a un breakpoint, usa `.table-responsive-sm`, `.table-responsive-md`, `.table-responsive-lg`, `.table-responsive-xl` o `.table-responsive-xxl` [1][2].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive",
+    "https://getbootstrap.com/docs/5.3/content/tables/#small-tables",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#responsive",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#stacked-to-horizontal",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#tables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1861,
+   "completion_tokens": 91,
+   "latency_ms": 3055,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre exactamente lo esencial: envolver la `.table` en un `.table-responsive` y menciona las variantes por breakpoint. No contiene clases inventadas ni errores y aporta un ejemplo práctico de código."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 824,
+     "completion": 90
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00180525,
+   "juez_cost_usd": 0.0001776,
+   "revisar": []
+  },
+  {
+   "id": 7,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Qué clases hay para el tamaño de los botones?",
+   "search_query": "¿Qué clases hay para el tamaño de los botones?",
+   "top_similarity": 0.7925659135806596,
+   "similarities": [
+    0.7925659135806596,
+    0.7687708694276686,
+    0.7344081038433768,
+    0.7304523312511471,
+    0.7296191760869307,
+    0.7266024792997811
+   ],
+   "answer_md": "Para cambiar el tamaño de los botones de forma individual, puedes utilizar las siguientes clases adicionales [1]:\n\n- `.btn-lg` para obtener botones más grandes [1].\n- `.btn-sm` para obtener botones más pequeños [1].\n\n```html\n<button type=\"button\" class=\"btn btn-primary btn-lg\">Large button</button>\n<button type=\"button\" class=\"btn btn-primary btn-sm\">Small button</button>\n```\n\nSi estás trabajando con un grupo de botones (`.btn-group`), puedes aplicar el tamaño a todo el grupo agregando las clases `.btn-group-lg` o `.btn-group-sm` directamente al contenedor, en lugar de asignarlas a cada botón individualmente [2].\n\nTambién tienes la opción de personalizar el tamaño de tus botones utilizando variables CSS directamente en el atributo `style` [1]:\n\n```html\n<button type=\"button\" class=\"btn btn-primary\" style=\"--bs-btn-padding-y: .25rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;\">\n  Custom button\n</button>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/form-control/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/modal/#optional-sizes"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3302,
+   "completion_tokens": 253,
+   "latency_ms": 9318,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre las clases `.btn-lg` y `.btn-sm`, muestra que se combinan con `.btn` y una variante como `.btn-primary`, y añade correctamente las opciones para grupos y variables CSS. No incluye clases obsoletas ni afirmaciones falsas sobre Bootstrap 5.3."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 958,
+     "completion": 85
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00723,
+   "juez_cost_usd": 0.0001947,
+   "revisar": []
+  },
+  {
+   "id": 7,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Qué clases hay para el tamaño de los botones?",
+   "search_query": "¿Qué clases hay para el tamaño de los botones?",
+   "top_similarity": 0.7925659135806596,
+   "similarities": [
+    0.7925659135806596,
+    0.7687708694276686,
+    0.7344081038433768,
+    0.7304523312511471,
+    0.7296191760869307,
+    0.7266024792997811
+   ],
+   "answer_md": "Para modificar el tamaño de los botones individuales en Bootstrap 5.3 se utilizan las siguientes clases [1]:\n\n- `btn-lg`: para botones más grandes [1].\n- `btn-sm`: para botones más pequeños [1].\n\nAdemás, si utilizas un grupo de botones (`btn-group`), puedes aplicar el tamaño a todo el conjunto agregando `btn-group-lg` o `btn-group-sm` directamente al contenedor `.btn-group` [2].\n\nEjemplo de uso:\n\n```html\n<!-- Botones individuales -->\n<button type=\"button\" class=\"btn btn-primary btn-lg\">Large button</button>\n<button type=\"button\" class=\"btn btn-primary btn-sm\">Small button</button>\n\n<!-- Grupos de botones -->\n<div class=\"btn-group btn-group-lg\" role=\"group\">\n  <button type=\"button\" class=\"btn btn-outline-primary\">Left</button>\n  <button type=\"button\" class=\"btn btn-outline-primary\">Right</button>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/form-control/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/modal/#optional-sizes"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3302,
+   "completion_tokens": 231,
+   "latency_ms": 6661,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre las clases de tamaño `.btn-lg` y `.btn-sm` y muestra que se combinan con `.btn` y una variante como `.btn-primary`. Añade correctamente el caso de grupos de botones sin incluir clases obsoletas o falsas."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 937,
+     "completion": 78
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00334275,
+   "juez_cost_usd": 0.00018734999999999997,
+   "revisar": []
+  },
+  {
+   "id": 7,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Qué clases hay para el tamaño de los botones?",
+   "search_query": "¿Qué clases hay para el tamaño de los botones?",
+   "top_similarity": 0.7925659135806596,
+   "similarities": [
+    0.7925659135806596,
+    0.7687708694276686,
+    0.7344081038433768,
+    0.7304523312511471,
+    0.7296191760869307,
+    0.7266024792997811
+   ],
+   "answer_md": "Las clases para el tamaño de los botones son `.btn-lg` y `.btn-sm` [1].\n\nSi hablas de **grupos de botones**, puedes usar `.btn-group-lg` y `.btn-group-sm` en `.btn-group` [2]. Si además te referías a **dropdown buttons**, también aparecen botones grandes y pequeños con `.btn-lg` y `.btn-sm` junto con `data-bs-toggle=\"dropdown\"` [5].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#sizing"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/form-control/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/modal/#optional-sizes"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2825,
+   "completion_tokens": 93,
+   "latency_ms": 2492,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "Responde las clases de tamaño principales `.btn-lg` y `.btn-sm`, pero no cubre que se usan combinadas con `.btn` y una variante como `.btn-primary`. No incluye clases inválidas ni afirmaciones falsas sobre Bootstrap 5.3."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 826,
+     "completion": 235
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 4,
+   "cost_usd": 0.00253725,
+   "juez_cost_usd": 0.0002649,
+   "revisar": []
+  },
+  {
+   "id": 8,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo oculto un elemento solo en celulares?",
+   "search_query": "¿Cómo oculto un elemento solo en celulares?",
+   "top_similarity": 0.729884260345331,
+   "similarities": [
+    0.729884260345331,
+    0.6611476717865391,
+    0.6578956842422906,
+    0.656497471211574,
+    0.6550091473782782,
+    0.65264860204102
+   ],
+   "answer_md": "Para ocultar un elemento únicamente en dispositivos móviles (pantallas extra pequeñas o `xs`), debes utilizar la combinación de clases `d-none d-sm-block` [1]. \n\nEsta combinación funciona de la siguiente manera gracias al enfoque *mobile-first* de Bootstrap [2][3]:\n- La clase `d-none` se aplica desde el ancho de pantalla más pequeño (móviles) en adelante, ocultando el elemento [1][3].\n- La clase `d-sm-block` se activa a partir del breakpoint de pantallas pequeñas (`sm`) hacia arriba, volviendo a mostrar el elemento como un bloque en pantallas más grandes [1][3].\n\nAquí tienes un ejemplo de cómo implementarlo en tu código:\n\n```html\n<div class=\"d-none d-sm-block\">\n  Este texto está oculto en celulares, pero es visible en pantallas sm, md, lg, xl y xxl.\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/#viewport-meta",
+    "https://getbootstrap.com/docs/5.3/extend/approach/#responsive"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/#viewport-meta",
+    "https://getbootstrap.com/docs/5.3/extend/approach/#responsive",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#html5-hidden-attribute",
+    "https://getbootstrap.com/docs/5.3/utilities/display/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/layout/utilities/#toggle-visibility"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2009,
+   "completion_tokens": 199,
+   "latency_ms": 2406,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde correctamente usando `d-none d-sm-block` y explica que se oculta en `xs` y vuelve a mostrarse desde `sm` en adelante. No contiene clases inválidas ni errores para Bootstrap 5.3, y aporta un ejemplo práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 942,
+     "completion": 80
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0048045,
+   "juez_cost_usd": 0.0001893,
+   "revisar": []
+  },
+  {
+   "id": 8,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo oculto un elemento solo en celulares?",
+   "search_query": "¿Cómo oculto un elemento solo en celulares?",
+   "top_similarity": 0.729884260345331,
+   "similarities": [
+    0.729884260345331,
+    0.6611476717865391,
+    0.6578956842422906,
+    0.656497471211574,
+    0.6550091473782782,
+    0.65264860204102
+   ],
+   "answer_md": "Para ocultar un elemento únicamente en dispositivos móviles o pantallas extra pequeñas (`xs`), debes combinar las clases `d-none` y `d-sm-block` [1].\n\nDebido al enfoque *mobile-first* [2][3], la clase `d-none` oculta el elemento a partir del ancho más pequeño (`min-width: 0`) [3], y `d-sm-block` vuelve a mostrarlo como bloque a partir del punto de interrupción `sm` en adelante [1][3].\n\n```html\n<div class=\"d-none d-sm-block\">Oculto solo en xs (móviles) y visible desde sm en adelante</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/#viewport-meta",
+    "https://getbootstrap.com/docs/5.3/extend/approach/#responsive"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/#viewport-meta",
+    "https://getbootstrap.com/docs/5.3/extend/approach/#responsive",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#html5-hidden-attribute",
+    "https://getbootstrap.com/docs/5.3/utilities/display/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/layout/utilities/#toggle-visibility"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2009,
+   "completion_tokens": 147,
+   "latency_ms": 12900,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde correctamente usando `d-none d-sm-block` y explica que se oculta en `xs` y vuelve a mostrarse desde `sm` en adelante. Incluye un ejemplo práctico y no usa clases obsoletas o inexistentes."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 890,
+     "completion": 109
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.002058,
+   "juez_cost_usd": 0.00019889999999999998,
+   "revisar": []
+  },
+  {
+   "id": 8,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo oculto un elemento solo en celulares?",
+   "search_query": "¿Cómo oculto un elemento solo en celulares?",
+   "top_similarity": 0.729884260345331,
+   "similarities": [
+    0.729884260345331,
+    0.6611476717865391,
+    0.6578956842422906,
+    0.656497471211574,
+    0.6550091473782782,
+    0.65264860204102
+   ],
+   "answer_md": "Para ocultar un elemento solo en celulares, usa `d-none` y luego vuelve a mostrarlo a partir de `sm` con `d-sm-block` [1]. Eso corresponde a **\"Visible only on sm\"** en la tabla de visibilidad por tamaños [1].\n\n```html\n<div class=\"d-none d-sm-block\">Solo se ve desde sm en adelante</div>\n```\n\nCon la documentación que encontré no puedo dar una regla específica para “solo en celulares” más allá de ese patrón de ocultar en `xs` y mostrar desde `sm` [1].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/#viewport-meta",
+    "https://getbootstrap.com/docs/5.3/extend/approach/#responsive",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#html5-hidden-attribute",
+    "https://getbootstrap.com/docs/5.3/utilities/display/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/layout/utilities/#toggle-visibility"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1856,
+   "completion_tokens": 123,
+   "latency_ms": 1940,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 1,
+     "util": 1,
+     "total": 4,
+     "motivo": "Da el patrón correcto `d-none d-sm-block` y explica que se muestra desde `sm` en adelante, con ejemplo práctico. Tiene una imprecisión al decir que corresponde a “Visible only on sm”, porque en realidad queda visible desde `sm` hacia arriba, no solo en `sm`."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 875,
+     "completion": 381
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 4,
+   "cost_usd": 0.0019455,
+   "juez_cost_usd": 0.00035985000000000005,
+   "revisar": []
+  },
+  {
+   "id": 9,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo activo el modo oscuro?",
+   "search_query": "¿Cómo activo el modo oscuro?",
+   "top_similarity": 0.7272367043951701,
+   "similarities": [
+    0.7272367043951701,
+    0.7090185013468883,
+    0.6987710171305641,
+    0.6859075138641231,
+    0.6818664480369148,
+    0.6795439529148097
+   ],
+   "answer_md": "Para activar el modo oscuro integrado en todo tu proyecto, debes añadir el atributo `data-bs-theme=\"dark\"` al elemento `<html>` [1]. Esto aplicará el modo oscuro a todos los componentes y elementos, excepto a aquellos que tengan un atributo `data-bs-theme` específico aplicado [1].\n\nUn ejemplo básico de cómo estructurar tu documento HTML para habilitar el modo oscuro es el siguiente [1]:\n\n```html\n<!doctype html>\n<html lang=\"es\" data-bs-theme=\"dark\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>Bootstrap demo</title>\n    <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB\" crossorigin=\"anonymous\">\n  </head>\n  <body>\n    <h1>¡Hola, mundo!</h1>\n    <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI\" crossorigin=\"anonymous\"></script>\n  </body>\n</html>\n```\n\nTambién tienes la opción de aplicar el modo oscuro de manera local en componentes o elementos específicos (y no de forma global) agregando el mismo atributo `data-bs-theme=\"dark\"` directamente sobre ellos o sobre su elemento padre [2][4].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#dark-mode",
+    "https://getbootstrap.com/docs/5.3/components/close-button/#dark-variant"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#building-with-sass",
+    "https://getbootstrap.com/docs/5.3/components/close-button/#dark-variant",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2289,
+   "completion_tokens": 425,
+   "latency_ms": 6859,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde correctamente: indica `data-bs-theme=\"dark\"` en `<html>` para modo oscuro global y que también puede aplicarse localmente a componentes o elementos. No inventa clases ni usa sintaxis incorrecta, y aporta un ejemplo práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1139,
+     "completion": 277
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0072585,
+   "juez_cost_usd": 0.00033705,
+   "revisar": []
+  },
+  {
+   "id": 9,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo activo el modo oscuro?",
+   "search_query": "¿Cómo activo el modo oscuro?",
+   "top_similarity": 0.7272367043951701,
+   "similarities": [
+    0.7272367043951701,
+    0.7090185013468883,
+    0.6987710171305641,
+    0.6859075138641231,
+    0.6818664480369148,
+    0.6795439529148097
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#building-with-sass",
+    "https://getbootstrap.com/docs/5.3/components/close-button/#dark-variant",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 5485,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 139
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00017595,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 9,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo activo el modo oscuro?",
+   "search_query": "¿Cómo activo el modo oscuro?",
+   "top_similarity": 0.7272367043951701,
+   "similarities": [
+    0.7272367043951701,
+    0.7090185013468883,
+    0.6987710171305641,
+    0.6859075138641231,
+    0.6818664480369148,
+    0.6795439529148097
+   ],
+   "answer_md": "Puedes activar el modo oscuro añadiendo `data-bs-theme=\"dark\"` al elemento `<html>`; eso aplica el modo oscuro a todo el proyecto, salvo a los elementos que tengan su propio `data-bs-theme` [1]. Bootstrap 5.3 también indica que los modos de color se pueden alternar globalmente en `<html>` o en componentes/elementos específicos con `data-bs-theme` [2].\n\nSi quieres hacerlo manualmente en un componente concreto, también puedes poner `data-bs-theme=\"dark\"` en `.btn-close` o en su contenedor para invertir ese botón [4]. Además, el modo oscuro puede desactivarse por Sass cambiando `$enable-dark-mode` a `false`, y existe el mixin `color-mode()` para controlar cómo se aplican los modos de color [3].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#dark-mode",
+    "https://getbootstrap.com/docs/5.3/components/close-button/#dark-variant",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#building-with-sass"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#building-with-sass",
+    "https://getbootstrap.com/docs/5.3/components/close-button/#dark-variant",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2068,
+   "completion_tokens": 169,
+   "latency_ms": 2505,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre lo esencial: `data-bs-theme=\"dark\"` en `<html>` para modo global y también en elementos/componentes concretos. No inventa clases ni usa sintaxis incorrecta; añade detalles de Sass válidos aunque algo accesorios."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 921,
+     "completion": 312
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0023115,
+   "juez_cost_usd": 0.00032535,
+   "revisar": []
+  },
+  {
+   "id": 10,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo pongo dos columnas del mismo ancho?",
+   "search_query": "¿Cómo pongo dos columnas del mismo ancho?",
+   "top_similarity": 0.7353190560543978,
+   "similarities": [
+    0.7353190560543978,
+    0.7127316505269982,
+    0.7094227595169391,
+    0.7066723179827921,
+    0.7020658254623613,
+    0.6950136241325224
+   ],
+   "answer_md": "Para poner dos columnas del mismo ancho en Bootstrap 5.3, puedes utilizar la clase `col` sin especificar un número [1][6]. Al colocar cualquier cantidad de estas clases sin unidad dentro de un contenedor con la clase `row`, el sistema de grid distribuirá el espacio disponible de forma equitativa entre ellas [1][4].\n\nEste comportamiento de auto-layout se aplica a todos los dispositivos y tamaños de pantalla, desde `xs` hasta `xxl` [1].\n\nAquí tienes un ejemplo práctico para crear una fila con dos columnas de igual ancho:\n\n```html\n<div class=\"container text-center\">\n  <div class=\"row\">\n    <div class=\"col\">\n      Columna 1 de 2\n    </div>\n    <div class=\"col\">\n      Columna 2 de 2\n    </div>\n  </div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#all-breakpoints",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#setting-one-column-width",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#variable-width-content",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#example-usage",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#all-breakpoints"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2168,
+   "completion_tokens": 185,
+   "latency_ms": 2100,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": false
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde directamente con `.row` y dos `.col` sin número, explicando que el espacio se reparte por igual en todos los breakpoints. Incluye un ejemplo práctico válido para Bootstrap 5.3 y no contiene sintaxis obsoleta."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 899,
+     "completion": 100
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.004917,
+   "juez_cost_usd": 0.00019485,
+   "revisar": []
+  },
+  {
+   "id": 10,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo pongo dos columnas del mismo ancho?",
+   "search_query": "¿Cómo pongo dos columnas del mismo ancho?",
+   "top_similarity": 0.7353190560543978,
+   "similarities": [
+    0.7353190560543978,
+    0.7127316505269982,
+    0.7094227595169391,
+    0.7066723179827921,
+    0.7020658254623613,
+    0.6950136241325224
+   ],
+   "answer_md": "Para poner dos columnas del mismo ancho, puedes agregar la clase `col` a cada una de ellas dentro de un contenedor con la clase `row` [1][4]. Al usar clases sin número, las columnas se repartirán el ancho disponible de manera equitativa en todos los dispositivos, desde `xs` hasta `xxl` [1][4].\n\nEjemplo:\n\n```html\n<div class=\"container text-center\">\n  <div class=\"row\">\n    <div class=\"col\">\n      1 of 2\n    </div>\n    <div class=\"col\">\n      2 of 2\n    </div>\n  </div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#setting-one-column-width",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#variable-width-content",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#example-usage",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#all-breakpoints"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2168,
+   "completion_tokens": 139,
+   "latency_ms": 5332,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": false
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde exactamente con una `.row` que contiene dos `.col` sin número y explica que se reparten el ancho disponible por igual en todos los tamaños. El ejemplo es correcto para Bootstrap 5.3 y no usa sintaxis inválida."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 856,
+     "completion": 129
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00214725,
+   "juez_cost_usd": 0.00020580000000000002,
+   "revisar": []
+  },
+  {
+   "id": 10,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo pongo dos columnas del mismo ancho?",
+   "search_query": "¿Cómo pongo dos columnas del mismo ancho?",
+   "top_similarity": 0.7353190560543978,
+   "similarities": [
+    0.7353190560543978,
+    0.7127316505269982,
+    0.7094227595169391,
+    0.7066723179827921,
+    0.7020658254623613,
+    0.6950136241325224
+   ],
+   "answer_md": "Puedes poner dos columnas del mismo ancho usando dos elementos con la clase `col` dentro de un `row`; Bootstrap indica que las `.col`s se reparten el ancho disponible por igual [4] y que con `.col` las columnas quedan del mismo ancho en todos los tamaños de dispositivo [1][6].\n\n```html\n<div class=\"container text-center\">\n  <div class=\"row\">\n    <div class=\"col\">Columna 1</div>\n    <div class=\"col\">Columna 2</div>\n  </div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#all-breakpoints"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#setting-one-column-width",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#variable-width-content",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#example-usage",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#all-breakpoints"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2043,
+   "completion_tokens": 119,
+   "latency_ms": 1867,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": false
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde directamente con `.row` y dos `.col` sin número, explicando que se reparten el ancho por igual. El ejemplo es correcto para Bootstrap 5.3 y no usa sintaxis obsoleta."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 834,
+     "completion": 95
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00206775,
+   "juez_cost_usd": 0.00018209999999999998,
+   "revisar": []
+  },
+  {
+   "id": 11,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "search_query": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "top_similarity": 0.784152478631365,
+   "similarities": [
+    0.784152478631365,
+    0.7820947949547808,
+    0.7512935693406695,
+    0.7503982930188831,
+    0.7448239922523499,
+    0.7410756349563599
+   ],
+   "answer_md": "Para validar un formulario con los estilos de Bootstrap 5.3, puedes optar por dos métodos principales: la validación del lado del cliente (estilos personalizados) o la validación del lado del servidor [1][3].\n\n### 1. Validación personalizada del lado del cliente\nPara aplicar los estilos personalizados de Bootstrap, debes seguir estos pasos:\n\n- Agrega el atributo booleano `novalidate` a tu elemento `<form>` para desactivar los mensajes emergentes por defecto del navegador [2].\n- Utiliza clases de feedback como `.valid-feedback` o `.invalid-feedback` para mostrar los mensajes de éxito o error [2].\n- Aplica clases de estructura como `.needs-validation` en el formulario [2].\n- Usa JavaScript para interceptar el envío del formulario. Si los campos requeridos no son válidos, previenes el envío; en cualquier caso, debes añadir la clase `.was-validated` al `<form>` para activar los estilos visuales `:invalid` y `:valid` de CSS [1][2].\n\nEjemplo de formulario con validación del lado del cliente [2]:\n\n```html\n<form class=\"row g-3 needs-validation\" novalidate>\n  <div class=\"col-md-4\">\n    <label for=\"validationCustom01\" class=\"form-label\">First name</label>\n    <input type=\"text\" class=\"form-control\" id=\"validationCustom01\" value=\"Mark\" required>\n    <div class=\"valid-feedback\">\n      Looks good!\n    </div>\n  </div>\n  <div class=\"col-12\">\n    <button class=\"btn btn-primary\" type=\"submit\">Submit form</button>\n  </div>\n</form>\n```\n\nY el JavaScript correspondiente para activar los estilos al intentar enviar [2]:\n\n```js\n(() => {\n  'use strict'\n\n  const forms = document.querySelectorAll('.needs-validation')\n\n  Array.from(forms).forEach(form => {\n    form.addEventListener('submit', event => {\n      if (!form.checkValidity()) {\n        event.preventDefault()\n        event.stopPropagation()\n      }\n\n      form.classList.add('was-validated')\n    }, false)\n  })\n})()\n```\n\n### 2. Validación del lado del servidor\nSi realizas la validación en el servidor, no necesitas la clase padre `.was-validated` [1]. En su lugar, puedes aplicar directamente las clases `.is-invalid` o `.is-valid` a los controles del formulario para indicar su estado [1][4]. \n\nPara asegurar la accesibilidad en campos inválidos, asocia el mensaje de error con el campo usando el atributo `aria-describedby` [4]. Además, si usas grupos de entrada (`input groups`), añade la clase `.has-validation` para evitar problemas con el radio del borde [4].\n\nEjemplo de validación del lado del servidor [4]:\n\n```html\n<form class=\"row g-3\">\n  <div class=\"col-md-4\">\n    <label for=\"validationServerUsername\" class=\"form-label\">Username</label>\n    <div class=\"input-group has-validation\">\n      <span class=\"input-group-text\" id=\"inputGroupPrepend3\">@</span>\n      <input type=\"text\" class=\"form-control is-invalid\" id=\"validationServerUsername\" aria-describedby=\"inputGroupPrepend3 validationServerUsernameFeedback\" required>\n      <div id=\"validationServerUsernameFeedback\" class=\"invalid-feedback\">\n        Please choose a username.\n      </div>\n    </div>\n  </div>\n</form>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#customizing",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#supported-elements"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3909,
+   "completion_tokens": 794,
+   "latency_ms": 4613,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre los puntos esenciales: `novalidate`, JavaScript que añade `.was-validated`, mensajes con `.valid-feedback`/`.invalid-feedback` y alternativa de servidor con `.is-valid`/`.is-invalid`. No incluye sintaxis obsoleta ni errores relevantes y aporta ejemplos prácticos."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1524,
+     "completion": 207
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0130095,
+   "juez_cost_usd": 0.00035279999999999996,
+   "revisar": []
+  },
+  {
+   "id": 11,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "search_query": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "top_similarity": 0.784152478631365,
+   "similarities": [
+    0.784152478631365,
+    0.7820947949547808,
+    0.7512935693406695,
+    0.7503982930188831,
+    0.7448239922523499,
+    0.7410756349563599
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#customizing",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#supported-elements"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 8222,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 151
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00018314999999999998,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 11,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "search_query": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "top_similarity": 0.784152478631365,
+   "similarities": [
+    0.784152478631365,
+    0.7820947949547808,
+    0.7512935693406695,
+    0.7503982930188831,
+    0.7448239922523499,
+    0.7410756349563599
+   ],
+   "answer_md": "Puedes validar un formulario con los estilos de Bootstrap así: añade `novalidate` al `<form>` para desactivar los tooltips nativos y usar las APIs de validación en JavaScript [2]. Bootstrap aplica los estilos `:invalid` y `:valid` a los controles cuando se usa `.was-validated` en el `<form>`, y puedes quitar esa clase para resetear la apariencia después del envío [1][2].\n\nSi prefieres validación del lado del servidor, usa `.is-invalid` y `.is-valid` en los campos; además, `.invalid-feedback` también es compatible con esas clases [4]. Para grupos de input, añade `.has-validation`, y para asociar el mensaje de error al campo usa `aria-describedby` [4].\n\nBootstrap indica que estos estilos están disponibles para `<input>` y `<textarea>` con `.form-control`, `<select>` con `.form-select` y `.form-check` [6]. Un ejemplo de validación personalizada sería:\n\n```html\n<form class=\"row g-3 needs-validation\" novalidate>\n  <div class=\"col-md-4\">\n    <label for=\"validationCustom01\" class=\"form-label\">First name</label>\n    <input type=\"text\" class=\"form-control\" id=\"validationCustom01\" required>\n    <div class=\"invalid-feedback\">Please provide a first name.</div>\n  </div>\n</form>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#supported-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#customizing",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#supported-elements"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3588,
+   "completion_tokens": 294,
+   "latency_ms": 4986,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 4,
+     "motivo": "La respuesta cubre `novalidate`, `.was-validated` y las clases `.is-valid`/`.is-invalid`, pero no explica claramente que hay que añadir `.was-validated` con JavaScript al intentar enviar ni muestra ese JS; tampoco menciona `.valid-feedback`. No contiene errores de fondo sobre Bootstrap 5.3 y da un ejemplo práctico, aunque incompleto."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1083,
+     "completion": 623
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 4,
+   "cost_usd": 0.004014,
+   "juez_cost_usd": 0.00053625,
+   "revisar": []
+  },
+  {
+   "id": 12,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "search_query": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "top_similarity": 0.796331251104921,
+   "similarities": [
+    0.796331251104921,
+    0.6909980730417848,
+    0.6903761710082497,
+    0.6899462527068715,
+    0.6760873593065957,
+    0.6756625948756755
+   ],
+   "answer_md": "Para centrar un modal verticalmente en la pantalla, debes agregar la clase `.modal-dialog-centered` al elemento que tiene la clase `.modal-dialog` [1]. \n\nSi además necesitas que el contenido del modal sea desplazable, puedes combinarla con la clase `.modal-dialog-scrollable` [1].\n\nAquí tienes un ejemplo de cómo estructurar el código:\n\n```html\n<div class=\"modal-dialog modal-dialog-centered\">\n  <div class=\"modal-content\">\n    <div class=\"modal-header\">\n      <h1 class=\"modal-title fs-5\">Modal centrado</h1>\n      <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\" aria-label=\"Close\"></button>\n    </div>\n    <div class=\"modal-body\">\n      Este modal aparece centrado verticalmente en la pantalla.\n    </div>\n    <div class=\"modal-footer\">\n      <button type=\"button\" class=\"btn btn-secondary\" data-bs-dismiss=\"modal\">Close</button>\n    </div>\n  </div>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered",
+    "https://getbootstrap.com/docs/5.3/components/modal/#dynamic-heights",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/components/modal/#live-demo",
+    "https://getbootstrap.com/docs/5.3/components/modal/#scrolling-long-content",
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2802,
+   "completion_tokens": 240,
+   "latency_ms": 4802,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde directamente que se debe agregar `.modal-dialog-centered` al `.modal-dialog` y muestra un ejemplo válido. No incluye soluciones manuales ni errores sobre Bootstrap 5.3."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 906,
+     "completion": 98
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.006363,
+   "juez_cost_usd": 0.0001947,
+   "revisar": []
+  },
+  {
+   "id": 12,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "search_query": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "top_similarity": 0.796331251104921,
+   "similarities": [
+    0.796331251104921,
+    0.6909980730417848,
+    0.6903761710082497,
+    0.6899462527068715,
+    0.6760873593065957,
+    0.6756625948756755
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered",
+    "https://getbootstrap.com/docs/5.3/components/modal/#dynamic-heights",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/components/modal/#live-demo",
+    "https://getbootstrap.com/docs/5.3/components/modal/#scrolling-long-content",
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 8452,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 144
+    },
+    {
+     "prompt": 572,
+     "completion": 119
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.0010542,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 12,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "search_query": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "top_similarity": 0.796331251104921,
+   "similarities": [
+    0.796331251104921,
+    0.6909980730417848,
+    0.6903761710082497,
+    0.6899462527068715,
+    0.6760873593065957,
+    0.6756625948756755
+   ],
+   "answer_md": "Añade `.modal-dialog-centered` a `.modal-dialog` para centrar el modal verticalmente [1].\n\n```html\n<div class=\"modal-dialog modal-dialog-centered\">\n  ...\n</div>\n```\n\nSi además el modal es desplazable, puedes combinarlo con `.modal-dialog-scrollable` [1].\n\n```html\n<div class=\"modal-dialog modal-dialog-centered modal-dialog-scrollable\">\n  ...\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered",
+    "https://getbootstrap.com/docs/5.3/components/modal/#dynamic-heights",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/components/modal/#live-demo",
+    "https://getbootstrap.com/docs/5.3/components/modal/#scrolling-long-content",
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2588,
+   "completion_tokens": 87,
+   "latency_ms": 3760,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde exactamente con la clase `.modal-dialog-centered` aplicada a `.modal-dialog` e incluye un ejemplo claro. No contiene errores ni propone CSS manual como solución principal."
+    },
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Responde con precisión indicando la clase `.modal-dialog-centered` en `.modal-dialog` e incluye ejemplos de código claros."
+    }
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 775,
+     "completion": 82
+    },
+    {
+     "prompt": 767,
+     "completion": 263
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": 5,
+   "cost_usd": 0.0023325,
+   "juez_cost_usd": 0.0017269499999999999,
+   "revisar": []
+  },
+  {
+   "id": 13,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "search_query": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "top_similarity": 0.7583901634157894,
+   "similarities": [
+    0.7583901634157894,
+    0.753958614096146,
+    0.7380249187976234,
+    0.7349231803234105,
+    0.7261627479695268,
+    0.7231768534674765
+   ],
+   "answer_md": "Para que un tooltip aparezca en Bootstrap 5.3, debes tener en cuenta que estos componentes son de tipo opt-in por razones de rendimiento, lo que significa que **debes inicializarlos tú mismo** mediante JavaScript para que puedan funcionar[5]. \n\nUna forma común de inicializar todos los tooltips de una página es seleccionarlos por su atributo `data-bs-toggle` e instanciarlos de la siguiente manera[1]:\n\n```js\nconst tooltipTriggerList = document.querySelectorAll('[data-bs-toggle=\"tooltip\"]')\nconst tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))\n```\n\nAdemás de la inicialización, asegúrate de cumplir con los siguientes requisitos para que el tooltip se muestre correctamente:\n- El elemento HTML debe tener un atributo `title` o `data-bs-title` con texto, ya que los tooltips con títulos de longitud cero nunca se muestran[2][5].\n- Si estás intentando poner un tooltip en un elemento con el atributo `disabled` o la clase `.disabled`, este no se mostrará porque los elementos deshabilitados no son interactivos[4][5]. Para solucionarlo, debes envolver el elemento deshabilitado en un `<div>` o `<span>` de envoltura (idealmente con `tabindex=\"0\"` para mantener la accesibilidad) y colocar el tooltip en ese contenedor[4].\n- Asegúrate de haber incluido la biblioteca externa Popper (ya sea mediante `popper.min.js` antes de `bootstrap.js`, o usando `bootstrap.bundle.min.js` que ya la incluye), puesto que los tooltips dependen de ella para su posicionamiento[5].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#markup",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#markup",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#usage",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#optionally-using-jquery"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2121,
+   "completion_tokens": 360,
+   "latency_ms": 3494,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre lo esencial: explica que los tooltips son opt-in, muestra inicialización con `new bootstrap.Tooltip(...)` y menciona Popper/`bootstrap.bundle`. Añade comprobaciones útiles sin introducir errores de Bootstrap 5.3."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1127,
+     "completion": 188
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0064215,
+   "juez_cost_usd": 0.00028184999999999994,
+   "revisar": []
+  },
+  {
+   "id": 13,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "search_query": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "top_similarity": 0.7583901634157894,
+   "similarities": [
+    0.7583901634157894,
+    0.753958614096146,
+    0.7380249187976234,
+    0.7349231803234105,
+    0.7261627479695268,
+    0.7231768534674765
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#markup",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#usage",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#optionally-using-jquery"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 2743,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 197
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00021075,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 13,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "search_query": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "top_similarity": 0.7583901634157894,
+   "similarities": [
+    0.7583901634157894,
+    0.753958614096146,
+    0.7380249187976234,
+    0.7349231803234105,
+    0.7261627479695268,
+    0.7231768534674765
+   ],
+   "answer_md": "El tooltip no aparece solo por poner `data-bs-toggle=\"tooltip\"`; antes hay que **inicializarlos** con JavaScript [1][5]. La documentación muestra que puedes seleccionar los elementos por `data-bs-toggle=\"tooltip\"` y crear instancias con `new bootstrap.Tooltip(...)` [1], o inicializarlos con `new bootstrap.Tooltip(exampleEl, options)` [3].\n\nAdemás, el marcado requerido es `data-bs-toggle` y `title`/`data-bs-title` en el elemento, y el tooltip debe colocarse sobre un elemento interactivo y focusable; en elementos `disabled` no funciona directamente y hay que usar un wrapper como `<div>` o `<span>` con `tabindex=\"0\"` [2][4]. También puede no mostrarse si el título tiene longitud cero, si el elemento está oculto, o si no incluyes Popper antes de `bootstrap.js` (o usas `bootstrap.bundle.min.js`) [5].\n\nUn ejemplo válido sería:\n\n```html\n<a href=\"#\" data-bs-toggle=\"tooltip\" data-bs-title=\"Some tooltip text!\">Hover over me</a>\n```\n\n```js\nconst tooltipTriggerList = document.querySelectorAll('[data-bs-toggle=\"tooltip\"]')\nconst tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#usage",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#markup",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#markup",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#usage",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#optionally-using-jquery"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2011,
+   "completion_tokens": 283,
+   "latency_ms": 2521,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 1,
+     "util": 1,
+     "total": 4,
+     "motivo": "Cubre lo esencial: explica que los tooltips son opt-in, muestra `new bootstrap.Tooltip(...)` y menciona Popper/`bootstrap.bundle`. Tiene una imprecisión menor al presentar como requisito estricto que el elemento sea interactivo y focusable, cuando es más una recomendación de accesibilidad salvo casos como elementos `disabled`."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1060,
+     "completion": 524
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 4,
+   "cost_usd": 0.00278175,
+   "juez_cost_usd": 0.00047339999999999996,
+   "revisar": []
+  },
+  {
+   "id": 14,
+   "tipo": "normal",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "answered",
+   "question": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "search_query": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "top_similarity": 0.7661754604641583,
+   "similarities": [
+    0.7661754604641583,
+    0.7296160321402915,
+    0.7245931702594057,
+    0.7200469208141613,
+    0.7083008723771687,
+    0.7078311526810791
+   ],
+   "answer_md": "Para crear un input con una etiqueta flotante (floating label), debes envolver un par de elementos `<input class=\"form-control\">` y `<label>` dentro de un contenedor con la clase `.form-floating` [1]. \n\nExisten tres requisitos muy importantes para que funcione correctamente:\n- El elemento `<input>` debe colocarse primero en el código HTML para poder utilizar un selector de hermanos en CSS [1].\n- Es obligatorio que el `<input>` tenga un atributo `placeholder` que no esté vacío, ya que el diseño depende del pseudoelemento `:placeholder-shown` para detectar cuándo el campo está vacío [1]. Cabe destacar que este texto del placeholder no será visible para el usuario, solo se mostrará la `<label>` [1].\n- Si el `<input>` ya cuenta con un atributo `value` definido, la `<label>` se ajustará automáticamente a su posición flotante [1].\n\nAquí tienes un ejemplo básico de cómo implementarlo:\n\n```html\n<div class=\"form-floating mb-3\">\n  <input type=\"email\" class=\"form-control\" id=\"floatingInput\" placeholder=\"name@example.com\">\n  <label for=\"floatingInput\">Email address</label>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#selects",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#input-groups",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#readonly-plaintext"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2319,
+   "completion_tokens": 262,
+   "latency_ms": 4255,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre los puntos esenciales: usa `.form-floating`, coloca el `input` antes del `label` y exige un `placeholder` no vacío. No contiene errores sobre Bootstrap 5.3 y aporta un ejemplo claro."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 996,
+     "completion": 72
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0058365,
+   "juez_cost_usd": 0.0001926,
+   "revisar": []
+  },
+  {
+   "id": 14,
+   "tipo": "normal",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "search_query": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "top_similarity": 0.7661754604641583,
+   "similarities": [
+    0.7661754604641583,
+    0.7296160321402915,
+    0.7245931702594057,
+    0.7200469208141613,
+    0.7083008723771687,
+    0.7078311526810791
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#selects",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#input-groups",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#readonly-plaintext"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 8134,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 154
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00018495,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 14,
+   "tipo": "normal",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "search_query": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "top_similarity": 0.7661754604641583,
+   "similarities": [
+    0.7661754604641583,
+    0.7296160321402915,
+    0.7245931702594057,
+    0.7200469208141613,
+    0.7083008723771687,
+    0.7078311526810791
+   ],
+   "answer_md": "Para crear una etiqueta flotante, envuelve un `<input class=\"form-control\">` y un `<label>` dentro de `.form-floating` [1]. El `<input>` debe ir primero, y necesita un `placeholder` no vacío; el texto del placeholder no se muestra, solo se ve el `<label>` [1].\n\n```html\n<div class=\"form-floating mb-3\">\n  <input type=\"email\" class=\"form-control\" id=\"floatingInput\" placeholder=\"name@example.com\">\n  <label for=\"floatingInput\">Email address</label>\n</div>\n```\n\nSi el `<input>` ya tiene `value`, el `<label>` se ajusta automáticamente a la posición flotante [1]. También funciona con validación usando clases como `is-invalid` [1].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#selects",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#input-groups",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#readonly-plaintext"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2094,
+   "completion_tokens": 164,
+   "latency_ms": 1843,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cubre exactamente lo esencial: contenedor `.form-floating`, `input.form-control` antes del `label` y `placeholder` no vacío, con un ejemplo correcto. No introduce clases inventadas ni errores sobre Bootstrap 5.3."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 907,
+     "completion": 75
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0023085,
+   "juez_cost_usd": 0.00018104999999999998,
+   "revisar": []
+  },
+  {
+   "id": 15,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "search_query": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "top_similarity": 0.6919611234759376,
+   "similarities": [
+    0.6919611234759376,
+    0.6877527722280875,
+    0.6873614005662444,
+    0.6852129813871641,
+    0.6825106957568003,
+    0.679162326826496
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/layout/containers/",
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.5-flash\nPlease retry in 21h55m7.061366794s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 884,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 138
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00017535,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 15,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "search_query": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "top_similarity": 0.6919611234759376,
+   "similarities": [
+    0.6919611234759376,
+    0.6877527722280875,
+    0.6873614005662444,
+    0.6852129813871641,
+    0.6825106957568003,
+    0.679162326826496
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/layout/containers/",
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash\nPlease retry in 21h55m8.913654092s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 1024,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 138
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00017535,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 15,
+   "tipo": "trampa_v4",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "search_query": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "top_similarity": 0.6919611234759376,
+   "similarities": [
+    0.6919611234759376,
+    0.6877527722280875,
+    0.6873614005662444,
+    0.6852129813871641,
+    0.6825106957568003,
+    0.679162326826496
+   ],
+   "answer_md": "No existe el componente `jumbotron` en Bootstrap 5.3: fue eliminado y se indica que puede replicarse con utilities [3]. Con la documentación que encontré sí puedo decirte eso, pero no veo un reemplazo concreto paso a paso en estos fragmentos [3].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/layout/containers/",
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 5076,
+   "completion_tokens": 61,
+   "latency_ms": 1969,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 2,
+     "util": 0,
+     "total": 3,
+     "motivo": "Aclara correctamente que `jumbotron` fue eliminado en Bootstrap 5.3, pero no da el equivalente práctico con utilidades como `p-5`, `mb-4`, `bg-body-tertiary` y `rounded-3`. No contiene errores de fondo, pero no responde de forma útil a cómo crearlo."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 807,
+     "completion": 232
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 3,
+   "cost_usd": 0.0040815,
+   "juez_cost_usd": 0.00026025,
+   "revisar": []
+  },
+  {
+   "id": 16,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo uso form-group y custom-select en un formulario?",
+   "search_query": "¿Cómo uso form-group y custom-select en un formulario?",
+   "top_similarity": 0.7762625358924552,
+   "similarities": [
+    0.7762625358924552,
+    0.7362570893696886,
+    0.7148199249173381,
+    0.7145566513269038,
+    0.7119424019272039,
+    0.7103054924434624
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/input-group/#custom-forms",
+    "https://getbootstrap.com/docs/5.3/forms/select/",
+    "https://getbootstrap.com/docs/5.3/forms/select/#sizing",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#utilities",
+    "https://getbootstrap.com/docs/5.3/migration/#forms-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.5-flash\nPlease retry in 21h54m38.363264968s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 892,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 157
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00018675,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 16,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo uso form-group y custom-select en un formulario?",
+   "search_query": "¿Cómo uso form-group y custom-select en un formulario?",
+   "top_similarity": 0.7762625358924552,
+   "similarities": [
+    0.7762625358924552,
+    0.7362570893696886,
+    0.7148199249173381,
+    0.7145566513269038,
+    0.7119424019272039,
+    0.7103054924434624
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/input-group/#custom-forms",
+    "https://getbootstrap.com/docs/5.3/forms/select/",
+    "https://getbootstrap.com/docs/5.3/forms/select/#sizing",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#utilities",
+    "https://getbootstrap.com/docs/5.3/migration/#forms-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash\nPlease retry in 21h54m39.77568454s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 1207,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 147
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00018075,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 16,
+   "tipo": "trampa_v4",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo uso form-group y custom-select en un formulario?",
+   "search_query": "¿Cómo uso form-group y custom-select en un formulario?",
+   "top_similarity": 0.7762625358924552,
+   "similarities": [
+    0.7762625358924552,
+    0.7362570893696886,
+    0.7148199249173381,
+    0.7145566513269038,
+    0.7119424019272039,
+    0.7103054924434624
+   ],
+   "answer_md": "`form-group` y `custom-select` son sintaxis de v4; en Bootstrap 5.3 se reemplazan por el uso de utilidades de espaciado como `mb-3` y por `form-select` [6][5][2]. La documentación indica que las clases de layout específicas de formularios como `.form-group` fueron eliminadas, y que `.custom-select` ahora es `.form-select` [6].\n\nPara un `select`, basta con usar la clase `form-select` [2]. Si lo quieres en un grupo de formularios, la documentación muestra el patrón con `mb-3` y `form-label` para separar y etiquetar los campos [5].\n\n```html\n<div class=\"mb-3\">\n  <label for=\"exampleSelect\" class=\"form-label\">Ejemplo</label>\n  <select class=\"form-select\" id=\"exampleSelect\" aria-label=\"Ejemplo select\">\n    <option selected>Open this select menu</option>\n    <option value=\"1\">One</option>\n    <option value=\"2\">Two</option>\n    <option value=\"3\">Three</option>\n  </select>\n</div>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#forms-1",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#utilities",
+    "https://getbootstrap.com/docs/5.3/forms/select/"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/input-group/#custom-forms",
+    "https://getbootstrap.com/docs/5.3/forms/select/",
+    "https://getbootstrap.com/docs/5.3/forms/select/#sizing",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#utilities",
+    "https://getbootstrap.com/docs/5.3/migration/#forms-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2589,
+   "completion_tokens": 247,
+   "latency_ms": 4104,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Aclara correctamente que `form-group` y `custom-select` son de Bootstrap 4 y da los equivalentes de Bootstrap 5.3: utilidades como `mb-3` y `.form-select`. No usa las clases antiguas como válidas y aporta un ejemplo práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1010,
+     "completion": 85
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00305325,
+   "juez_cost_usd": 0.0002025,
+   "revisar": []
+  },
+  {
+   "id": 17,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "search_query": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "top_similarity": 0.764810334202549,
+   "similarities": [
+    0.764810334202549,
+    0.716585933202415,
+    0.6939992442132894,
+    0.6913676055858624,
+    0.6759015288705127,
+    0.6690721917092616
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/badge/#pill-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#positioned",
+    "https://getbootstrap.com/docs/5.3/components/list-group/#with-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#buttons",
+    "https://getbootstrap.com/docs/5.3/components/badge/#headings",
+    "https://getbootstrap.com/docs/5.3/components/badge/#background-colors"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.5-flash\nPlease retry in 21h54m14.288649663s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 1659,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 132
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00017175,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 17,
+   "tipo": "trampa_v4",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "search_query": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "top_similarity": 0.764810334202549,
+   "similarities": [
+    0.764810334202549,
+    0.716585933202415,
+    0.6939992442132894,
+    0.6913676055858624,
+    0.6759015288705127,
+    0.6690721917092616
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/badge/#pill-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#positioned",
+    "https://getbootstrap.com/docs/5.3/components/list-group/#with-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#buttons",
+    "https://getbootstrap.com/docs/5.3/components/badge/#headings",
+    "https://getbootstrap.com/docs/5.3/components/badge/#background-colors"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash\nPlease retry in 21h54m16.911267004s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 1489,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 164
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00019094999999999998,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 17,
+   "tipo": "trampa_v4",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "search_query": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "top_similarity": 0.764810334202549,
+   "similarities": [
+    0.764810334202549,
+    0.716585933202415,
+    0.6939992442132894,
+    0.6913676055858624,
+    0.6759015288705127,
+    0.6690721917092616
+   ],
+   "answer_md": "`badge-pill` y `float-right` son sintaxis de Bootstrap 4; en Bootstrap 5.3, para un badge redondeado usa `rounded-pill` [1] y `float-right` no aparece en los fragmentos, así que no puedo confirmar su equivalente desde esta documentación. Sí puedo mostrarte un badge redondeado con `rounded-pill` [1] y un ejemplo de badge dentro de un `list-group-item` alineado con `d-flex justify-content-between align-items-center`, que distribuye el contenido a ambos lados [3]:\n\n```html\n<ul class=\"list-group\">\n  <li class=\"list-group-item d-flex justify-content-between align-items-center\">\n    A list item\n    <span class=\"badge text-bg-primary rounded-pill\">14</span>\n  </li>\n</ul>\n```",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/badge/#pill-badges",
+    "https://getbootstrap.com/docs/5.3/components/list-group/#with-badges"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/badge/#pill-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#positioned",
+    "https://getbootstrap.com/docs/5.3/components/list-group/#with-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#buttons",
+    "https://getbootstrap.com/docs/5.3/components/badge/#headings",
+    "https://getbootstrap.com/docs/5.3/components/badge/#background-colors"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1932,
+   "completion_tokens": 173,
+   "latency_ms": 2261,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 1,
+     "util": 0,
+     "total": 2,
+     "motivo": "Aclara que `badge-pill` y `float-right` son de Bootstrap 4 y usa bien `rounded-pill`, pero no da el equivalente requerido `float-end` para Bootstrap 5.3. La alternativa con flex puede funcionar en ese ejemplo, pero no responde directamente cómo sustituir `float-right`."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 926,
+     "completion": 477
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 2,
+   "cost_usd": 0.0022275,
+   "juez_cost_usd": 0.00042510000000000003,
+   "revisar": [
+    "nota baja (2)"
+   ]
+  },
+  {
+   "id": 18,
+   "tipo": "fuera",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo hago un hook personalizado en React?",
+   "search_query": "¿Cómo hago un hook personalizado en React?",
+   "top_similarity": 0.5887571500959335,
+   "similarities": [
+    0.5887571500959335,
+    0.5847492218018243,
+    0.5779538034451454,
+    0.5687515560540611,
+    0.5682709731733648,
+    0.5679546241598018
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/helpers/focus-ring/#example",
+    "https://getbootstrap.com/docs/5.3/customize/components/#creating-your-own",
+    "https://getbootstrap.com/docs/5.3/layout/containers/#sass-mixins",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#custom-color-modes",
+    "https://getbootstrap.com/docs/5.3/components/popovers/#custom-popovers",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#css"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.5-flash\nPlease retry in 21h53m48.351157968s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 812,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 197
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00021075,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 18,
+   "tipo": "fuera",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo hago un hook personalizado en React?",
+   "search_query": "¿Cómo hago un hook personalizado en React?",
+   "top_similarity": 0.5887571500959335,
+   "similarities": [
+    0.5887571500959335,
+    0.5847492218018243,
+    0.5779538034451454,
+    0.5687515560540611,
+    0.5682709731733648,
+    0.5679546241598018
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/helpers/focus-ring/#example",
+    "https://getbootstrap.com/docs/5.3/customize/components/#creating-your-own",
+    "https://getbootstrap.com/docs/5.3/layout/containers/#sass-mixins",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#custom-color-modes",
+    "https://getbootstrap.com/docs/5.3/components/popovers/#custom-popovers",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#css"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash\nPlease retry in 21h53m49.762039127s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 1413,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 124
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00016695,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 18,
+   "tipo": "fuera",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo hago un hook personalizado en React?",
+   "search_query": "¿Cómo hago un hook personalizado en React?",
+   "top_similarity": 0.5887571500959335,
+   "similarities": [
+    0.5887571500959335,
+    0.5847492218018243,
+    0.5779538034451454,
+    0.5687515560540611,
+    0.5682709731733648,
+    0.5679546241598018
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/helpers/focus-ring/#example",
+    "https://getbootstrap.com/docs/5.3/customize/components/#creating-your-own",
+    "https://getbootstrap.com/docs/5.3/layout/containers/#sass-mixins",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#custom-color-modes",
+    "https://getbootstrap.com/docs/5.3/components/popovers/#custom-popovers",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#css"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1926,
+   "completion_tokens": 16,
+   "latency_ms": 2099,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta identifica correctamente que el tema no está en la documentación de Bootstrap 5.3 y no explica React. Es breve y adecuada para una pregunta fuera de alcance."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 702,
+     "completion": 103
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0015165,
+   "juez_cost_usd": 0.0001671,
+   "revisar": []
+  },
+  {
+   "id": 19,
+   "tipo": "fuera",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "search_query": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "top_similarity": 0.6745246877915454,
+   "similarities": [
+    0.6745246877915454,
+    0.6628042657020818,
+    0.6624600078780146,
+    0.6472714965982751,
+    0.6471069613025251,
+    0.6449827839347155
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#no-grid-classes",
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#three-columns",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#columns-and-gaps",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#adding-rows",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#starts"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.5-flash\nPlease retry in 21h53m28.031705418s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 1106,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 130
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00017055,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 19,
+   "tipo": "fuera",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "search_query": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "top_similarity": 0.6745246877915454,
+   "similarities": [
+    0.6745246877915454,
+    0.6628042657020818,
+    0.6624600078780146,
+    0.6472714965982751,
+    0.6471069613025251,
+    0.6449827839347155
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#no-grid-classes",
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#three-columns",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#columns-and-gaps",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#adding-rows",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#starts"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash\nPlease retry in 21h53m30.048529216s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 807,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 161
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00018915,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 19,
+   "tipo": "fuera",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "search_query": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "top_similarity": 0.6745246877915454,
+   "similarities": [
+    0.6745246877915454,
+    0.6628042657020818,
+    0.6624600078780146,
+    0.6472714965982751,
+    0.6471069613025251,
+    0.6449827839347155
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#no-grid-classes",
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#three-columns",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#columns-and-gaps",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#adding-rows",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#starts"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1506,
+   "completion_tokens": 16,
+   "latency_ms": 1453,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "Cumple con indicar que CSS Grid puro no está en la documentación de Bootstrap 5.3 y no da una receta ajena como si fuera de Bootstrap. Es breve y adecuada para una pregunta fuera de alcance."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 755,
+     "completion": 115
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0012015,
+   "juez_cost_usd": 0.00018225,
+   "revisar": []
+  },
+  {
+   "id": 20,
+   "tipo": "fuera",
+   "model": "gemini-3.5-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo configuro un modelo en Django?",
+   "search_query": "¿Cómo configuro un modelo en Django?",
+   "top_similarity": 0.5774306537583036,
+   "similarities": [
+    0.5774306537583036,
+    0.5709198798908028,
+    0.5670773663152063,
+    0.5646952145256687,
+    0.5644934513864692,
+    0.5576210274571056
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage",
+    "https://getbootstrap.com/docs/5.3/components/modal/#options",
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/#configure-webpack",
+    "https://getbootstrap.com/docs/5.3/components/modal/#via-javascript",
+    "https://getbootstrap.com/docs/5.3/components/modal/#modal-components",
+    "https://getbootstrap.com/docs/5.3/getting-started/parcel/#configure-parcel"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.5-flash\nPlease retry in 21h53m9.335525049s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 737,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 115
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00016155000000000002,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 20,
+   "tipo": "fuera",
+   "model": "gemini-3.7-flash",
+   "provider": "gemini",
+   "outcome": "error",
+   "question": "¿Cómo configuro un modelo en Django?",
+   "search_query": "¿Cómo configuro un modelo en Django?",
+   "top_similarity": 0.5774306537583036,
+   "similarities": [
+    0.5774306537583036,
+    0.5709198798908028,
+    0.5670773663152063,
+    0.5646952145256687,
+    0.5644934513864692,
+    0.5576210274571056
+   ],
+   "answer_md": null,
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage",
+    "https://getbootstrap.com/docs/5.3/components/modal/#options",
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/#configure-webpack",
+    "https://getbootstrap.com/docs/5.3/components/modal/#via-javascript",
+    "https://getbootstrap.com/docs/5.3/components/modal/#modal-components",
+    "https://getbootstrap.com/docs/5.3/getting-started/parcel/#configure-parcel"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash\nPlease retry in 21h53m10.848204966s.",
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "latency_ms": 778,
+   "auto": {
+    "error": true,
+    "nego": false,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    null,
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 617,
+     "completion": 125
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    null
+   ],
+   "nota": null,
+   "cost_usd": null,
+   "juez_cost_usd": 0.00016755,
+   "revisar": [
+    "sin nota de los jueces"
+   ]
+  },
+  {
+   "id": 20,
+   "tipo": "fuera",
+   "model": "gpt-5.4-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo configuro un modelo en Django?",
+   "search_query": "¿Cómo configuro un modelo en Django?",
+   "top_similarity": 0.5774306537583036,
+   "similarities": [
+    0.5774306537583036,
+    0.5709198798908028,
+    0.5670773663152063,
+    0.5646952145256687,
+    0.5644934513864692,
+    0.5576210274571056
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage",
+    "https://getbootstrap.com/docs/5.3/components/modal/#options",
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/#configure-webpack",
+    "https://getbootstrap.com/docs/5.3/components/modal/#via-javascript",
+    "https://getbootstrap.com/docs/5.3/components/modal/#modal-components",
+    "https://getbootstrap.com/docs/5.3/getting-started/parcel/#configure-parcel"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2923,
+   "completion_tokens": 16,
+   "latency_ms": 1328,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta identifica correctamente que el tema no está cubierto por la documentación de Bootstrap 5.3 y no explica Django. Es breve, directa y útil para una pregunta fuera de alcance."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 699,
+     "completion": 65
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00226425,
+   "juez_cost_usd": 0.00014385,
+   "revisar": []
+  }
+ ]
+}
