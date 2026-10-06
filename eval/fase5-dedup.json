@@ -1,0 +1,585 @@
+{
+ "fecha": "2026-10-05",
+ "modelo": "gemini-embedding-2 @1536, prefijo \"task: sentence similarity | query:\"",
+ "descripcion": "Calibración del umbral de deduplicación semántica de preguntas. Pares del mismo chat y tema; duplicado = evalúa el mismo concepto con la misma respuesta (marcado a mano). A = solo enunciado, B = enunciado con la respuesta correcta.",
+ "preguntas": 38,
+ "pares": 70,
+ "umbral_elegido": 0.935,
+ "variante_elegida": "B",
+ "resumen": {
+  "A": {
+   "dup_min": 0.9132,
+   "no_dup_max": 0.9308,
+   "detectados": "7/10",
+   "falsos_positivos": 0
+  },
+  "B": {
+   "dup_min": 0.9387,
+   "no_dup_max": 0.9431,
+   "detectados": "10/10",
+   "falsos_positivos": 1
+  }
+ },
+ "pairs": [
+  {
+   "topic": "layout/gutters",
+   "simA": 1,
+   "simB": 1,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": true
+  },
+  {
+   "topic": "getting-started/introduction",
+   "simA": 0.9881,
+   "simB": 0.9839,
+   "p1": "¿Qué atributo se debe incluir en la etiqueta CSS al cargar Bootstrap desde la CDN para verificar que el archivo y la versión sean correctos? → `integrity`",
+   "p2": "Para cargar Bootstrap desde la CDN, en la etiqueta CSS se debe incluir el atributo ______ para verificar que el archivo y la versión sean co → integrity",
+   "duplicado": true
+  },
+  {
+   "topic": "getting-started/introduction",
+   "simA": 0.9694,
+   "simB": 0.9829,
+   "p1": "¿Qué componente requiere JavaScript y Popper para mostrar y posicionar contenido desplegable? → `Dropdowns`",
+   "p2": "¿Qué componente de Bootstrap requiere JavaScript y Popper para mostrarse y posicionarse? → `Dropdowns`",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9511,
+   "simB": 0.9803,
+   "p1": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9746,
+   "simB": 0.9734,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": true
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.9582,
+   "simB": 0.9623,
+   "p1": "En una navbar responsive como la del ejemplo, la clase `______` se usa para ampliar la barra a partir del breakpoint `lg` → `navbar-expand-lg`",
+   "p2": "Una navbar responsive como la del ejemplo usa `______` para colapsarse automáticamente en el breakpoint `lg` → navbar-expand-lg",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9276,
+   "simB": 0.9595,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9697,
+   "simB": 0.9577,
+   "p1": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "p2": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9312,
+   "simB": 0.9485,
+   "p1": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "p2": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.927,
+   "simB": 0.9431,
+   "p1": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9132,
+   "simB": 0.9387,
+   "p1": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "p2": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "duplicado": true
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8933,
+   "simB": 0.9342,
+   "p1": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9308,
+   "simB": 0.9182,
+   "p1": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9296,
+   "simB": 0.9167,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8939,
+   "simB": 0.9025,
+   "p1": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "p2": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8712,
+   "simB": 0.9002,
+   "p1": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.855,
+   "simB": 0.8999,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9017,
+   "simB": 0.8998,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9017,
+   "simB": 0.8998,
+   "p1": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.892,
+   "simB": 0.898,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.892,
+   "simB": 0.898,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.9,
+   "simB": 0.8955,
+   "p1": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8819,
+   "simB": 0.8902,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8911,
+   "simB": 0.8893,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8341,
+   "simB": 0.8888,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8518,
+   "simB": 0.8888,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8518,
+   "simB": 0.8888,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8658,
+   "simB": 0.8862,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8906,
+   "simB": 0.8831,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "¿Qué clase puede añadirse a las `row columns` para aplicar gutters responsivos? → `g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8802,
+   "simB": 0.8826,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8802,
+   "simB": 0.8826,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/grid",
+   "simA": 0.8768,
+   "simB": 0.8822,
+   "p1": "En un grid que debe empezar con una sola columna por fila en el nivel más pequeño, pasar a 2 columnas desde `sm` y a 4 desde `md`, ¿qué comb → `row row-cols-1 row-cols-sm-2 row-cols-md-4`",
+   "p2": "En un grid de Bootstrap, ¿qué clase debes usar para dar una anchura fija de 6 columnas a una sola columna mientras las columnas hermanas se  → `col-6`",
+   "duplicado": false
+  },
+  {
+   "topic": "components/buttons",
+   "simA": 0.826,
+   "simB": 0.8815,
+   "p1": "¿Qué clase debes añadir a un botón para que conserve el estilo base de `btn` pero use el tamaño pequeño indicado en los ejemplos? → `btn-sm`",
+   "p2": "La clase base de Bootstrap que establece estilos básicos como padding y alineación del contenido es ______ → `btn`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8746,
+   "simB": 0.8812,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8643,
+   "simB": 0.8812,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8643,
+   "simB": 0.8812,
+   "p1": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8791,
+   "simB": 0.8797,
+   "p1": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "p2": "¿Qué clases se usan para controlar el ancho vertical de los gutters dentro de una fila cuando las columnas se ajustan a nuevas líneas? → `.gy-*`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8747,
+   "simB": 0.8796,
+   "p1": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "p2": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/download",
+   "simA": 0.8758,
+   "simB": 0.8796,
+   "p1": "¿Qué nombre recibe la opción que te permite evitar la descarga y servir la versión en caché del CSS y JavaScript compilados de Bootstrap con → `CDN via jsDelivr`",
+   "p2": "¿Qué opción de descarga incluye el CSS y el JavaScript compilados y listos para usar de Bootstrap v5.3.8? → Compiled CSS and JS",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8801,
+   "simB": 0.8774,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8801,
+   "simB": 0.8774,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8746,
+   "simB": 0.8768,
+   "p1": "En una fila con columnas que se envuelven a nuevas líneas, ¿qué clase se usa para ajustar los gutters verticales? → `.gy-*`",
+   "p2": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8713,
+   "simB": 0.8747,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.861,
+   "simB": 0.8737,
+   "p1": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "p2": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8452,
+   "simB": 0.8734,
+   "p1": "En una cuadrícula con columnas responsivas, la combinación que aplica gutters pequeños y los aumenta a partir de `lg` es ______ → `g-2 g-lg-3`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8571,
+   "simB": 0.8724,
+   "p1": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "p2": "Las clases `.gx-*` se usan para controlar el ancho horizontal de ______ → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8521,
+   "simB": 0.8716,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8521,
+   "simB": 0.8716,
+   "p1": "Las clases `.gy-*` se usan para controlar el ancho vertical de ______ dentro de una fila cuando las columnas se ajustan a nuevas líneas → los gutters",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8722,
+   "simB": 0.8715,
+   "p1": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "p2": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8722,
+   "simB": 0.8715,
+   "p1": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "p2": "¿Qué clase elimina los gutters de una cuadrícula predefinida de Bootstrap? → `.g-0`",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8796,
+   "simB": 0.8691,
+   "p1": "En una navbar responsive como la del ejemplo, la clase `______` se usa para ampliar la barra a partir del breakpoint `lg` → `navbar-expand-lg`",
+   "p2": "En una navbar que incluye enlaces y texto, ¿qué clase se usa para mostrar un bloque de texto con ajuste de alineación vertical y espaciado h → `navbar-text`",
+   "duplicado": false
+  },
+  {
+   "topic": "components/modal",
+   "simA": 0.8846,
+   "simB": 0.8685,
+   "p1": "En un modal de Bootstrap, la clase que se añade al contenedor para que el contenido del propio modal pueda desplazarse es ______ → `modal-dialog-scrollable`",
+   "p2": "En un modal de Bootstrap, el atributo que cierra automáticamente el componente al pulsarlo es ______ → `data-bs-dismiss=\"modal\"`",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8571,
+   "simB": 0.8684,
+   "p1": "En una navbar fija en la parte superior, ¿qué clase debes añadir para sacar la barra del flujo normal y qué ajuste adicional puede ser neces → `fixed-top` y `padding-top` en el `<body>`",
+   "p2": "En una navbar que incluye enlaces y texto, ¿qué clase se usa para mostrar un bloque de texto con ajuste de alineación vertical y espaciado h → `navbar-text`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/gutters",
+   "simA": 0.8715,
+   "simB": 0.8656,
+   "p1": "En Bootstrap, los gutters son el espacio entre el contenido de las columnas, creado por ______ → `padding` horizontal",
+   "p2": "En una cuadrícula con columnas responsivas, ¿qué combinación de clases permite aplicar gutters pequeños y, a partir del breakpoint `lg`, aum → `row-cols-2 row-cols-lg-5 g-2 g-lg-3`",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/download",
+   "simA": 0.8591,
+   "simB": 0.8595,
+   "p1": "¿Qué necesitas instalar para que Bootstrap se compile como sus versiones oficiales al usar un gestor de paquetes? → Un compilador Sass y `Autoprefixer`",
+   "p2": "¿Qué opción de descarga incluye el CSS y el JavaScript compilados y listos para usar de Bootstrap v5.3.8? → Compiled CSS and JS",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/introduction",
+   "simA": 0.8665,
+   "simB": 0.8584,
+   "p1": "Para que Bootstrap aplique correctamente sus estilos básicos, la página debe usar el doctype ______ → `<!doctype html>`",
+   "p2": "Para cargar Bootstrap desde la CDN, en la etiqueta CSS se debe incluir el atributo ______ para verificar que el archivo y la versión sean co → integrity",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.864,
+   "simB": 0.8506,
+   "p1": "En una navbar que incluye enlaces y texto, ¿qué clase se usa para mostrar un bloque de texto con ajuste de alineación vertical y espaciado h → `navbar-text`",
+   "p2": "Una navbar responsive como la del ejemplo usa `______` para colapsarse automáticamente en el breakpoint `lg` → navbar-expand-lg",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8536,
+   "simB": 0.8471,
+   "p1": "En una navbar responsive como la del ejemplo, la clase `______` se usa para ampliar la barra a partir del breakpoint `lg` → `navbar-expand-lg`",
+   "p2": "En una navbar fija en la parte superior, ¿qué clase debes añadir para sacar la barra del flujo normal y qué ajuste adicional puede ser neces → `fixed-top` y `padding-top` en el `<body>`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/grid",
+   "simA": 0.8548,
+   "simB": 0.8452,
+   "p1": "En un grid que debe empezar con una sola columna por fila en el nivel más pequeño, pasar a 2 columnas desde `sm` y a 4 desde `md`, ¿qué comb → `row row-cols-1 row-cols-sm-2 row-cols-md-4`",
+   "p2": "Bootstrap’s grid system uses a series of ______, rows, and columns to layout and align content. → containers",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/introduction",
+   "simA": 0.8535,
+   "simB": 0.8429,
+   "p1": "Para que Bootstrap aplique correctamente sus estilos básicos, la página debe usar el doctype ______ → `<!doctype html>`",
+   "p2": "¿Qué atributo se debe incluir en la etiqueta CSS al cargar Bootstrap desde la CDN para verificar que el archivo y la versión sean correctos? → `integrity`",
+   "duplicado": false
+  },
+  {
+   "topic": "layout/grid",
+   "simA": 0.8388,
+   "simB": 0.8386,
+   "p1": "En un grid de Bootstrap, ¿qué clase debes usar para dar una anchura fija de 6 columnas a una sola columna mientras las columnas hermanas se  → `col-6`",
+   "p2": "Bootstrap’s grid system uses a series of ______, rows, and columns to layout and align content. → containers",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8356,
+   "simB": 0.8377,
+   "p1": "¿Qué atributo debes añadir a la etiqueta `.navbar` para activar un modo de color oscuro específico del componente? → `data-bs-theme=\"dark\"`",
+   "p2": "En una navbar que incluye enlaces y texto, ¿qué clase se usa para mostrar un bloque de texto con ajuste de alineación vertical y espaciado h → `navbar-text`",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8492,
+   "simB": 0.8354,
+   "p1": "¿Qué atributo debes añadir a la etiqueta `.navbar` para activar un modo de color oscuro específico del componente? → `data-bs-theme=\"dark\"`",
+   "p2": "Una navbar responsive como la del ejemplo usa `______` para colapsarse automáticamente en el breakpoint `lg` → navbar-expand-lg",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8414,
+   "simB": 0.8341,
+   "p1": "En una navbar fija en la parte superior, ¿qué clase debes añadir para sacar la barra del flujo normal y qué ajuste adicional puede ser neces → `fixed-top` y `padding-top` en el `<body>`",
+   "p2": "Una navbar responsive como la del ejemplo usa `______` para colapsarse automáticamente en el breakpoint `lg` → navbar-expand-lg",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8339,
+   "simB": 0.8301,
+   "p1": "¿Qué atributo debes añadir a la etiqueta `.navbar` para activar un modo de color oscuro específico del componente? → `data-bs-theme=\"dark\"`",
+   "p2": "En una navbar fija en la parte superior, ¿qué clase debes añadir para sacar la barra del flujo normal y qué ajuste adicional puede ser neces → `fixed-top` y `padding-top` en el `<body>`",
+   "duplicado": false
+  },
+  {
+   "topic": "components/navbar",
+   "simA": 0.8397,
+   "simB": 0.8244,
+   "p1": "En una navbar responsive como la del ejemplo, la clase `______` se usa para ampliar la barra a partir del breakpoint `lg` → `navbar-expand-lg`",
+   "p2": "¿Qué atributo debes añadir a la etiqueta `.navbar` para activar un modo de color oscuro específico del componente? → `data-bs-theme=\"dark\"`",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/download",
+   "simA": 0.8384,
+   "simB": 0.8188,
+   "p1": "¿Qué necesitas instalar para que Bootstrap se compile como sus versiones oficiales al usar un gestor de paquetes? → Un compilador Sass y `Autoprefixer`",
+   "p2": "¿Qué nombre recibe la opción que te permite evitar la descarga y servir la versión en caché del CSS y JavaScript compilados de Bootstrap con → `CDN via jsDelivr`",
+   "duplicado": false
+  },
+  {
+   "topic": "utilities/spacing",
+   "simA": 0.8248,
+   "simB": 0.8109,
+   "p1": "En un contenedor `d-grid` con `gap-0`, ¿qué clase añade espacio vertical entre los elementos sin modificar el espacio horizontal? → `row-gap-3`",
+   "p2": "La clase `______` elimina el margen o el padding estableciéndolo en `0` → m-0",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/introduction",
+   "simA": 0.8048,
+   "simB": 0.7965,
+   "p1": "¿Qué componente de Bootstrap requiere JavaScript y Popper para mostrarse y posicionarse? → `Dropdowns`",
+   "p2": "Para enlazar la hoja de estilos de Bootstrap desde la CDN principal, se usa la URL de ______ → `https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/boots",
+   "duplicado": false
+  },
+  {
+   "topic": "getting-started/introduction",
+   "simA": 0.7936,
+   "simB": 0.7794,
+   "p1": "¿Qué componente requiere JavaScript y Popper para mostrar y posicionar contenido desplegable? → `Dropdowns`",
+   "p2": "Para enlazar la hoja de estilos de Bootstrap desde la CDN principal, se usa la URL de ______ → `https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/boots",
+   "duplicado": false
+  }
+ ]
+}

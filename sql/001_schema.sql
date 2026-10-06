@@ -146,6 +146,8 @@ CREATE INDEX IF NOT EXISTS quiz_questions_topic_recent_idx
 
 -- -----------------------------------------------------------------------------
 -- submit_answer: registra una respuesta de forma atómica.
+-- (Versión de la Fase 1. La vigente, con el test de la lección, está en
+--  004_fase5.sql, que se ejecuta después y la reemplaza.)
 --
 -- FOR UPDATE bloquea la fila de la pregunta: si llegan dos toques del mismo
 -- botón casi a la vez (doble toque en Telegram), el segundo espera al primero,

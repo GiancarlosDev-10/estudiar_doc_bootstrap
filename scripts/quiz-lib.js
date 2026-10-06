@@ -218,30 +218,68 @@ function inlineHtml(s) {
 const LETTERS = ['A', 'B', 'C', 'D'];
 const LEVEL_LABEL = { basico: 'básico', intermedio: 'intermedio', avanzado: 'avanzado' };
 
-function quizHeader({ title, level, format }) {
-  return `🧠 <b>Quiz · ${inlineHtml(title)}</b>\n<i>Nivel ${LEVEL_LABEL[level] ?? level}${format === 'cloze' ? ' · completa el espacio' : ''}</i>`;
+// origin (Fase 5): 'hoy' = pregunta del test de la lección (test_pos de 3),
+// 'repaso' = tema con el repaso vencido; lo demás, quiz normal.
+const TEST_SIZE = 3;
+function quizHeader({ title, level, format, origin, test_pos }) {
+  const t = inlineHtml(title);
+  const head = origin === 'hoy' ? `📝 <b>Test de la lección · ${t}</b> (${test_pos}/${TEST_SIZE})`
+    : origin === 'repaso' ? `🔁 <b>Repaso · ${t}</b>`
+      : `🧠 <b>Quiz · ${t}</b>`;
+  return `${head}\n<i>Nivel ${LEVEL_LABEL[level] ?? level}${format === 'cloze' ? ' · completa el espacio' : ''}</i>`;
 }
 
 // Mensaje con la pregunta (los botones A-D los agrega el nodo de Telegram).
-function formatQuestionMessage({ title, level, format, question, options }) {
+function formatQuestionMessage({ title, level, format, question, options, origin, test_pos }) {
   const opts = options.map((o, i) => `<b>${LETTERS[i]})</b> ${inlineHtml(o)}`).join('\n');
-  return `${quizHeader({ title, level, format })}\n\n${inlineHtml(question)}\n\n${opts}`;
+  return `${quizHeader({ title, level, format, origin, test_pos })}\n\n${inlineHtml(question)}\n\n${opts}`;
 }
 
 // Mensaje editado después de responder: marca la elegida y la correcta, y
 // agrega la explicación, la fuente (de la metadata, nunca del LLM) y el progreso.
-function formatAnsweredMessage({ title, level, format, question, options }, r) {
+function formatAnsweredMessage({ title, level, format, question, options, origin, test_pos }, r) {
   const opts = options.map((o, i) => {
     const mark = i === r.correct_index ? '✅' : i === r.selected_index ? '❌' : '▫️';
     return `${mark} <b>${LETTERS[i]})</b> ${inlineHtml(o)}`;
   }).join('\n');
   const verdict = r.is_correct ? '<b>¡Correcto!</b>' : `<b>Incorrecto.</b> La respuesta era la ${LETTERS[r.correct_index]}.`;
-  const lines = [quizHeader({ title, level, format }), '', inlineHtml(question), '', opts, '',
+  const lines = [quizHeader({ title, level, format, origin, test_pos }), '', inlineHtml(question), '', opts, '',
     `${verdict} ${inlineHtml(r.explanation)}`, '',
     `📚 <a href="${String(r.source_url).replace(/"/g, '&quot;')}">Fuente oficial</a>`];
   const progress = progressLine(level, r);
   if (progress) lines.push('', progress);
+  const test = testLine(r.test);
+  if (test) lines.push('', test);
   return lines.join('\n');
+}
+
+// Resultado del test de la lección: solo en la respuesta que lo cierra
+// (just_finished), así no se repite si hay doble toque.
+function testLine(t) {
+  if (!t || !t.just_finished) return '';
+  if (t.passed) {
+    return `🎉 <b>Test superado</b> (${t.correct}/${t.total}). El tema queda visto` +
+      (t.next_topic ? `; lo siguiente en la ruta es <b>${inlineHtml(t.next_topic)}</b>.` : ' y terminaste la ruta.');
+  }
+  return `📚 <b>Test: ${t.correct}/${t.total}.</b> Necesitas 2 aciertos para pasar de tema: repasa la lección y vuelve a intentarlo.`;
+}
+
+// -----------------------------------------------------------------------------
+// nextButton: el único botón que queda en el mensaje después de responder.
+// Telegram limita callback_data a 64 bytes: h:n:<uuid> ocupa 40.
+// -----------------------------------------------------------------------------
+function nextButton(r) {
+  const t = r?.test;
+  if (t && !t.finished) return { text: `Siguiente pregunta (${t.answered + 1}/${t.total}) ➡️`, data: `h:n:${t.test_id}` };
+  if (t && t.just_finished && t.passed) return { text: '📖 Siguiente lección', data: 'n:hoy' };
+  if (t && t.just_finished) return { text: '🔁 Repetir test', data: `h:t:${t.topic_order}` };
+  return { text: 'Otra pregunta ➡️', data: 'n:quiz' };
+}
+
+// Callback "Siguiente pregunta" del test: h:n:<uuid> → uuid; si no, null.
+function testIdFromCallback(data) {
+  const m = String(data ?? '').match(/^h:n:([0-9a-f-]{36})$/);
+  return m ? m[1] : null;
 }
 
 function progressLine(oldLevel, r) {
@@ -264,6 +302,42 @@ function answerToast(r) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Deduplicación semántica (corrección de app-ure, que solo comparaba texto
+// exacto). Se embebe la pregunta con gemini-embedding-2 y se compara por coseno
+// con las preguntas recientes del mismo tema.
+//
+// dedupText: qué se embebe. variant 'B' (la que se usa) = la pregunta CON su
+// respuesta correcta: en una de completar el concepto evaluado está justo en el
+// espacio en blanco, y sin la respuesta "integrity ______" y "¿qué atributo…?"
+// no se parecen. 'A' = solo el enunciado (se conserva para la medición).
+// Prefijo simétrico "task: sentence similarity": aquí se comparan preguntas
+// con preguntas, no una consulta con un documento (eso es el asimétrico del RAG).
+// -----------------------------------------------------------------------------
+// Umbral calibrado el 2026-10-05 con 70 pares reales (eval/fase5-dedup.json):
+// con la variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el
+// límite (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que
+// separe: un duplicado quedaba en 0,913 y un par distinto en 0,931.
+// Un falso positivo cuesta un reintento; un falso negativo, una pregunta repetida.
+const DEDUP_THRESHOLD = 0.935;
+// Contra cuántas preguntas recientes del mismo tema se compara.
+const DEDUP_RECENT = 20;
+
+function dedupText({ question, options, correct_index, format }, variant = 'B') {
+  const clean = (s) => String(s ?? '').replace(/`/g, '').replace(/\s+/g, ' ').trim();
+  const q = clean(question);
+  const answer = clean(options?.[correct_index]);
+  let text = q;
+  if (variant === 'B') text = format === 'cloze' && q.includes(BLANK) ? q.replace(BLANK, answer) : `${q} Respuesta: ${answer}`;
+  return `task: sentence similarity | query: ${text}`;
+}
+
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return na && nb ? dot / Math.sqrt(na * nb) : 0;
+}
+
 // "/quiz navbar" → "navbar"; "/quiz css grid" → "css-grid"; "/quiz" → null.
 function topicHint(text) {
   const h = String(text ?? '').trim().replace(/^\/quiz(@\w+)?/i, '').trim().toLowerCase().replace(/\s+/g, '-');
@@ -274,4 +348,6 @@ if (typeof module !== 'undefined') module.exports = {
   WINDOW_BY_LEVEL, QUIZ_SCHEMA, BLANK,
   pickWindow, useCloze, buildQuizPrompt, parseQuizJson, validateQuiz, shuffleOptions,
   inlineHtml, formatQuestionMessage, formatAnsweredMessage, answerToast, topicHint,
+  TEST_SIZE, testLine, nextButton, testIdFromCallback,
+  DEDUP_THRESHOLD, DEDUP_RECENT, dedupText, cosine,
 };

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   pickWindow, useCloze, buildQuizPrompt, parseQuizJson, validateQuiz, shuffleOptions,
   inlineHtml, formatQuestionMessage, formatAnsweredMessage, answerToast, topicHint,
+  nextButton, testIdFromCallback,
 } = require('./quiz-lib');
 
 let pass = 0;
@@ -142,6 +143,44 @@ test('topicHint', () => {
   assert.equal(topicHint('/quiz'), null);
   assert.equal(topicHint('/quiz Navbar'), 'navbar');
   assert.equal(topicHint('/quiz@Bot css grid'), 'css-grid');
+});
+
+// --- Fase 5: test de la lección y repasos ---
+const tid = '4a0d7836-794b-419b-9b75-41d52375b472';
+const testState = (o) => ({ test_id: tid, answered: 1, correct: 1, total: 3, finished: false, just_finished: false,
+  passed: false, topic_order: 7, next_topic: 'Grid system', ...o });
+
+test('cabecera según el origen: test (2/3), repaso o quiz', () => {
+  const base = { title: 'Navbar', level: 'basico', format: 'multiple', question: '¿?', options: good.options };
+  assert.match(formatQuestionMessage({ ...base, origin: 'hoy', test_pos: 2 }), /Test de la lección · Navbar<\/b> \(2\/3\)/);
+  assert.match(formatQuestionMessage({ ...base, origin: 'repaso' }), /🔁 <b>Repaso · Navbar/);
+  assert.match(formatQuestionMessage({ ...base, origin: 'quiz' }), /🧠 <b>Quiz · Navbar/);
+});
+
+test('nextButton: siguiente del test, siguiente lección, repetir test u otra pregunta', () => {
+  assert.deepEqual(nextButton({ test: testState() }), { text: 'Siguiente pregunta (2/3) ➡️', data: `h:n:${tid}` });
+  assert.deepEqual(nextButton({ test: testState({ finished: true, just_finished: true, passed: true }) }), { text: '📖 Siguiente lección', data: 'n:hoy' });
+  assert.deepEqual(nextButton({ test: testState({ finished: true, just_finished: true }) }), { text: '🔁 Repetir test', data: 'h:t:7' });
+  assert.equal(nextButton({ test: null }).data, 'n:quiz');
+  // pregunta vieja de un test abandonado: ya terminado, pero no lo cerró esta respuesta
+  assert.equal(nextButton({ test: testState({ finished: true }) }).data, 'n:quiz');
+  for (const b of [nextButton({ test: testState() }), nextButton({ test: testState({ finished: true, just_finished: true, topic_order: 9999 }) })]) {
+    assert.ok(Buffer.byteLength(b.data) <= 64, 'callback_data supera 64 bytes');
+  }
+});
+
+test('formatAnsweredMessage muestra el resultado del test solo al cerrarlo', () => {
+  const q = { title: 'Grid', level: 'basico', format: 'multiple', question: '¿?', options: good.options, origin: 'hoy', test_pos: 3 };
+  const r = { is_correct: true, selected_index: 0, correct_index: 0, explanation: 'x', source_url: 'u', interval_days: 2 };
+  assert.match(formatAnsweredMessage(q, { ...r, test: testState({ finished: true, just_finished: true, passed: true, correct: 2 }) }), /Test superado<\/b> \(2\/3\).*Grid system/);
+  assert.match(formatAnsweredMessage(q, { ...r, test: testState({ finished: true, just_finished: true, correct: 1 }) }), /Test: 1\/3/);
+  assert.doesNotMatch(formatAnsweredMessage(q, { ...r, test: testState() }), /Test superado|Test: /);
+});
+
+test('testIdFromCallback', () => {
+  assert.equal(testIdFromCallback(`h:n:${tid}`), tid);
+  assert.equal(testIdFromCallback('n:quiz'), null);
+  assert.equal(testIdFromCallback(`h:n:${tid}x`), null);
 });
 
 console.log(`\n${pass} pruebas OK`);

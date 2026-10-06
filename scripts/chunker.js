@@ -31,11 +31,19 @@ const OVERLAP_CHARS = 600;
 // un fragmento de una línea embebe mal y casi nunca se recupera.
 const MIN_CHARS = 200;
 
-// Partes de la ruta de estudio: el orden oficial del sidebar, sin las
-// secciones que no son materia de estudio. Se indexan igual para el RAG.
-const STUDY_SECTIONS = ['getting-started', 'customize', 'layout', 'content', 'forms', 'components', 'helpers', 'utilities'];
+// Partes de la ruta de estudio, EN ESTE ORDEN (las páginas de cada sección sí
+// siguen el orden del sidebar). Customize va al final (decisión de la Fase 5):
+// Sass, variables CSS y color modes personalizan componentes y utilidades, así
+// que se entienden mejor después de conocerlos; el sidebar oficial los pone
+// segundos. Lo que queda fuera de la ruta se indexa igual para el RAG y se
+// puede pedir con "/quiz <tema>".
+const STUDY_SECTIONS = ['getting-started', 'layout', 'content', 'forms', 'components', 'helpers', 'utilities', 'customize'];
+// Fuera de la ruta: guías de instalación con herramientas de build y páginas
+// informativas (descarga, contenido del paquete, navegadores): no hay nada que
+// practicar en un quiz.
 const STUDY_EXCLUDE = new Set([
   'getting-started/webpack', 'getting-started/parcel', 'getting-started/vite', 'getting-started/contribute',
+  'getting-started/download', 'getting-started/contents', 'getting-started/browsers-devices',
 ]);
 // Páginas que no se indexan: docsref es una página interna de pruebas del sitio.
 const SKIP_PAGES = new Set(['docsref']);
@@ -534,12 +542,15 @@ function buildChunks(files, version) {
     }
   }
 
-  // Ruta de estudio en el orden del sidebar oficial.
+  // Ruta de estudio: secciones en el orden de STUDY_SECTIONS, páginas en el
+  // orden del sidebar oficial.
   const studyPath = [];
   let order = 0;
-  for (const group of parseSidebar(files['site/data/sidebar.yml'] || '')) {
+  const groups = parseSidebar(files['site/data/sidebar.yml'] || '')
+    .filter((g) => STUDY_SECTIONS.includes(sidebarSlug(g.title)))
+    .sort((a, b) => STUDY_SECTIONS.indexOf(sidebarSlug(a.title)) - STUDY_SECTIONS.indexOf(sidebarSlug(b.title)));
+  for (const group of groups) {
     const section = sidebarSlug(group.title);
-    if (!STUDY_SECTIONS.includes(section)) continue;
     for (const pageTitle of group.pages) {
       const page = sidebarSlug(pageTitle);
       const key = `${section}/${page}`;

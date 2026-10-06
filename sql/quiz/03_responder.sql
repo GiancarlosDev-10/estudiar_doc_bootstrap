@@ -17,7 +17,9 @@ WITH p AS (
     FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint, data text)
 ),
 antes AS (
-  SELECT q.question, q.options, q.format, q.difficulty, q.topic_key, sp.title
+  SELECT q.question, q.options, q.format, q.difficulty, q.topic_key, sp.title, q.origin,
+         -- posición de la pregunta dentro del test de la lección (1, 2 o 3)
+         (SELECT count(*) FROM quiz_questions o WHERE o.test_id = q.test_id AND o.created_at <= q.created_at) AS test_pos
     FROM p
     JOIN quiz_questions q ON q.id = (p.g[1])::uuid AND q.chat_id = p.chat_id
     JOIN study_path sp ON sp.topic_key = q.topic_key
@@ -27,6 +29,6 @@ r AS (
               ELSE submit_answer((p.g[1])::uuid, p.chat_id, (p.g[2])::int) END AS res
     FROM p
 )
-SELECT r.res, a.question, a.options, a.format, a.topic_key, a.title, a.difficulty
+SELECT r.res, a.question, a.options, a.format, a.topic_key, a.title, a.difficulty, a.origin, a.test_pos
   FROM r
   LEFT JOIN antes a ON true;

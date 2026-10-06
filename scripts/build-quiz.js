@@ -5,12 +5,13 @@
 //
 // Uso:
 //   node scripts/build-quiz.js --postgres <credId> --telegram <credId> \
-//     --openai <credId> --testSecret <credId> --out-dir tmp
+//     --openai <credId> --testSecret <credId> --gemini <credId> --out-dir tmp
 // Los IDs de credencial se pasan por argumento: nunca se guardan en el repo.
 //
 // Versión liviana de la Fase 4 (acordada con el usuario el 2026-10-03):
 // - solo gpt-5.4-mini, con un reintento HTTP; sin cadena de respaldo Gemini;
-// - sin dedup por embedding: el prompt recibe las últimas 5 preguntas del tema;
+// - el prompt recibe las últimas 5 preguntas del tema y, desde la Fase 5, además
+//   hay deduplicación semántica por embedding (umbral calibrado, eval/fase5-dedup.json);
 // - sí: validación por código con un reintento, y opciones barajadas por código.
 // =============================================================================
 const fs = require('fs');
@@ -34,6 +35,10 @@ const pg = { postgres: { id: arg('postgres'), name: 'BS Postgres' } };
 const telegram = { telegramApi: { id: arg('telegram'), name: 'Bootstrap_bot' } };
 const openai = { openAiApi: { id: arg('openai'), name: 'OpenAI account' } };
 const testSecret = { httpHeaderAuth: { id: arg('testSecret'), name: 'BS Test RAG Secret' } };
+const gemini = { googlePalmApi: { id: arg('gemini'), name: 'BS Gemini' } };
+// Embeddings de la deduplicación: el mismo modelo y dimensión que los fragmentos.
+const EMBED_MODEL = 'gemini-embedding-2';
+const EMBED_DIMS = 1536;
 
 const promptBody = (file) => {
   const parts = read(file).split(/^---$/m);
@@ -44,7 +49,7 @@ const promptBody = (file) => {
 };
 const QUIZ_PROMPT = promptBody('prompts/quiz.md');
 const quizLibSrc = read('scripts/quiz-lib.js');
-const { QUIZ_SCHEMA } = require('./quiz-lib');
+const { QUIZ_SCHEMA, DEDUP_RECENT } = require('./quiz-lib');
 // Con sangría: el JSON compacto termina en "}}}" y n8n lo leería como el
 // cierre de la expresión {{ }} ("invalid syntax").
 const SCHEMA_EXPR = JSON.stringify(QUIZ_SCHEMA, null, 1);
@@ -93,7 +98,7 @@ function buildGenerar() {
   const R = "$('Resultado').first().json";
   const nodes = [
     node('g1', 'Entrada', 'n8n-nodes-base.executeWorkflowTrigger', 1.2, [0, 0], { inputSource: 'passthrough' },
-      { notes: 'Del router: { chat_id, text: "/quiz [tema]" } o el botón "Otra pregunta" (callback_query_id). De [BS] Test Quiz: además { dry_run: true, force_level }.' }),
+      { notes: 'Del router: { chat_id, text: "/quiz [tema]" }, el botón "Otra pregunta" (n:quiz) o "Siguiente pregunta" del test (h:n:<test_id>). De [BS] Lección del día / Envío diario: { chat_id, test_id? }. De [BS] Test Quiz: además { dry_run: true, force_level, rand }.' }),
 
     node('g2', 'Preparar', 'n8n-nodes-base.code', 2, [220, 0], {
       mode: 'runOnceForEachItem',
@@ -103,8 +108,13 @@ const dry_run = $json.dry_run === true;
 return { json: {
   chat_id: Number($json.chat_id),
   dry_run,
-  origin: 'quiz',
   hint: topicHint($json.text),
+  // Test de la lección: lo manda [BS] Lección del día (test_id) o el botón
+  // "Siguiente pregunta" (h:n:<test_id>).
+  test_id: $json.test_id ?? testIdFromCallback($json.callback_data),
+  // 70 % tema actual / 30 % tema débil (sql/quiz/01_tema.sql). El azar lo pone
+  // el código; el arnés puede fijarlo para probar las dos ramas.
+  rand: dry_run && typeof $json.rand === 'number' ? $json.rand : Math.random(),
   callback_query_id: $json.callback_query_id ?? null,
   message_id: $json.message_id ?? null,
   // Solo en el arnés: probar un nivel sin tener que responder 3 seguidas.
@@ -136,10 +146,10 @@ return { json: {
     node('g5', 'Elegir tema', 'n8n-nodes-base.postgres', 2.7, [1000, 0], {
       operation: 'executeQuery',
       query: sqlExpr('sql/quiz/01_tema.sql', {
-        __PARAMS_JSON__: "JSON.stringify({ chat_id: $('Preparar').first().json.chat_id, hint: $('Preparar').first().json.hint })",
+        __PARAMS_JSON__: "JSON.stringify({ chat_id: $('Preparar').first().json.chat_id, hint: $('Preparar').first().json.hint, test_id: $('Preparar').first().json.test_id, rand: $('Preparar').first().json.rand })",
       }),
       options: {},
-    }, { credentials: pg, notes: 'Siempre 1 fila: tema, nivel, seed, últimas 5 preguntas y fragmentos (sql/quiz/01_tema.sql). Selección provisional hasta la Fase 5.' }),
+    }, { credentials: pg, notes: 'Siempre 1 fila: tema, nivel, seed, últimas 5 preguntas y fragmentos (sql/quiz/01_tema.sql). Selección: test → pedido → repaso vencido → 70 % ruta / 30 % tema débil.' }),
 
     node('g6', 'Armar prompt', 'n8n-nodes-base.code', 2, [1100, 0], {
       mode: 'runOnceForEachItem',
@@ -157,12 +167,21 @@ if (!t.topic_key) {
     : 'No encontré un tema para preguntarte ahora. Prueba con /quiz navbar o /quiz grid.';
   return { json: { ...base, done: true, outcome: 'no_topic', message: msg } };
 }
+// Test ya completo (3 preguntas) o cerrado: un toque viejo de "Siguiente pregunta".
+if (base.test_id && (t.test_finished || Number(t.test_asked) >= TEST_SIZE)) {
+  return { json: { ...base, done: true, outcome: 'test_done', message: 'Ese test ya terminó. Escribe /hoy para ver tu lección o /quiz para seguir practicando.' } };
+}
 
 const level = base.force_level ?? t.level;
 const seed = Number(t.seed);
 const cloze = useCloze(Number(t.total));
-const window = pickWindow(t.chunks, seed, level);
-return { json: { ...base, done: false,
+// Reintento por pregunta repetida: la ventana siguiente de la página. Con los
+// mismos fragmentos el modelo no tiene otro concepto del que preguntar (medido
+// el 2026-10-05: 5 de 5 reintentos con la misma ventana volvían a repetirse).
+const window = pickWindow(t.chunks, seed + (retry?.dedup_retry ? 1 : 0), level);
+// origin se guarda en quiz_questions: 'hoy' = test de la lección, 'repaso' = vencido.
+const origin = t.motivo === 'hoy' ? 'hoy' : t.motivo === 'repaso' ? 'repaso' : 'quiz';
+return { json: { ...base, done: false, origin, test_pos: origin === 'hoy' ? Number(t.test_asked) + 1 : null,
   topic_key: t.topic_key, title: t.title, motivo: t.motivo, level, seed, cloze,
   window: window.map(({ id, url }) => ({ id, url })),
   prompt_text: buildQuizPrompt({ title: t.title, level, cloze, chunks: window, recent: t.recent, errors: retry?.errors ?? [] }),
@@ -219,11 +238,55 @@ return { json: { ...state, ...tokens, retry: false, outcome: 'ok', model: '${QUI
   // La fuente sale de la metadata del fragmento elegido, nunca del texto del modelo.
   source_url: p.window[s.source_fragment - 1].url,
   chunk_ids: p.window.map((c) => c.id),
-  html: formatQuestionMessage({ title: p.title, level: p.level, format, question: s.question, options: s.options }) } };`,
+  dedup_text: dedupText({ question: s.question, options: s.options, correct_index: s.correct_index, format }),
+  html: formatQuestionMessage({ title: p.title, level: p.level, format, question: s.question, options: s.options,
+    origin: p.origin, test_pos: p.test_pos }) } };`,
     }, { notes: 'Valida el contenido (4 opciones distintas, 125 %, completar, v4, fragmento citado), baraja las opciones y arma el HTML.' }),
 
     ifNode('g10', '¿Reintentar?', [1980, -140], '={{ $json.retry }}', IS_TRUE, '',
       { notes: 'Un solo reintento; si la segunda versión también falla, se avisa al usuario y no se guarda nada.' }),
+
+    ifNode('g10b', '¿Válida?', [2090, -280], '={{ $json.outcome }}', { type: 'string', operation: 'equals' }, 'ok'),
+
+    node('g10c', 'Embeber pregunta', 'n8n-nodes-base.httpRequest', 4.5, [2200, -420], {
+      method: 'POST',
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'googlePalmApi',
+      sendBody: true,
+      specifyBody: 'json',
+      jsonBody: `={{ JSON.stringify({ content: { parts: [{ text: $json.dedup_text }] }, outputDimensionality: ${EMBED_DIMS} }) }}`,
+      options: { timeout: 30000 },
+    }, { credentials: gemini, retryOnFail: true, maxTries: 2, waitBetweenTries: 2000, onError: 'continueRegularOutput',
+      notes: 'Deduplicación semántica: pregunta + respuesta correcta (quiz-lib.dedupText). Si Gemini falla, la pregunta se acepta sin comparar.' }),
+
+    node('g10d', 'Buscar parecida', 'n8n-nodes-base.postgres', 2.7, [2310, -420], {
+      operation: 'executeQuery',
+      query: sqlExpr('sql/quiz/06_parecida.sql', {
+        __PARAMS_JSON__: "JSON.stringify({ chat_id: $('Validar').item.json.chat_id, topic_key: $('Validar').item.json.topic_key, emb: $json.embedding?.values ? '[' + $json.embedding.values.join(',') + ']' : null })",
+        __RECENT__: String(DEDUP_RECENT),
+      }),
+      options: {},
+    }, { credentials: pg, notes: `La más parecida entre las últimas ${DEDUP_RECENT} preguntas del tema (coseno con pgvector).` }),
+
+    node('g10e', 'Decidir dedup', 'n8n-nodes-base.code', 2, [2420, -420], {
+      mode: 'runOnceForEachItem',
+      jsCode: `${quizLibSrc}
+
+const v = $('Validar').item.json;
+const values = $('Embeber pregunta').item.json.embedding?.values ?? null;
+const sim = $json.sim == null ? null : Number($json.sim);
+// Repetida: un reintento pidiendo otro concepto. En el último intento se
+// acepta igual (mejor una pregunta parecida que ninguna) y queda registrado.
+if (sim !== null && sim >= DEDUP_THRESHOLD && v.attempt < 2) {
+  return { json: { ...v, retry: true, dedup_retry: true, dedup_sim: sim, rejected: [...v.rejected, ['repetida (' + sim.toFixed(3) + ')']],
+    errors: ['La pregunta es casi igual a una que ya se hizo de este tema (similitud ' + sim.toFixed(2) + '): "' +
+      $json.similar_question + '". Pregunta por OTRO concepto de los fragmentos, no por el mismo con otras palabras.'] } };
+}
+return { json: { ...v, retry: false, dedup_sim: sim, emb: values ? '[' + values.join(',') + ']' : '' } };`,
+    }, { notes: 'Umbral calibrado con 70 pares reales: eval/fase5-dedup.json (quiz-lib.DEDUP_THRESHOLD).' }),
+
+    ifNode('g10f', '¿Repetida?', [2530, -420], '={{ $json.retry }}', IS_TRUE, ''),
 
     node('g11', 'Error LLM', 'n8n-nodes-base.code', 2, [1760, 60], {
       mode: 'runOnceForEachItem',
@@ -242,10 +305,10 @@ return { json: { ...state, outcome: 'error',
     node('g14', 'Guardar', 'n8n-nodes-base.postgres', 2.7, [2640, -140], {
       operation: 'executeQuery',
       query: sqlExpr('sql/quiz/02_guardar.sql', {
-        __ROW_JSON__: `JSON.stringify({ chat_id: $json.chat_id, topic_key: $json.topic_key, origin: $json.origin,
+        __ROW_JSON__: `JSON.stringify({ chat_id: $json.chat_id, topic_key: $json.topic_key, origin: $json.origin, test_id: $json.test_id,
   chunk_ids: $json.chunk_ids, difficulty: $json.level, format: $json.format, question: $json.question,
   options: $json.options, correct_index: $json.correct_index, explanation: $json.explanation,
-  source_url: $json.source_url, model: $json.model, prompt_tokens: $json.prompt_tokens, completion_tokens: $json.completion_tokens })`,
+  source_url: $json.source_url, emb: $json.emb, model: $json.model, prompt_tokens: $json.prompt_tokens, completion_tokens: $json.completion_tokens })`,
       }),
       options: {},
     }, { credentials: pg, notes: 'INSERT en quiz_questions; RETURNING id para el callback_data de los botones.' }),
@@ -277,10 +340,11 @@ return { json: { ...state, outcome: 'error',
 const r = $('Resultado').first().json;
 const id = $('Guardar').isExecuted ? $('Guardar').first().json.id : null;
 return [{ json: { id, outcome: r.outcome, message: r.message ?? null, error: r.error ?? null,
-  topic_key: r.topic_key ?? null, motivo: r.motivo ?? null, level: r.level ?? null, format: r.format ?? null,
+  topic_key: r.topic_key ?? null, motivo: r.motivo ?? null, origin: r.origin ?? null, test_id: r.test_id ?? null,
+  test_pos: r.test_pos ?? null, level: r.level ?? null, format: r.format ?? null,
   question: r.question ?? null, options: r.options ?? null, correct_index: r.correct_index ?? null,
   explanation: r.explanation ?? null, source_url: r.source_url ?? null, rejected: r.rejected ?? [],
-  attempt: r.attempt ?? null, prompt_tokens: r.prompt_tokens ?? null, completion_tokens: r.completion_tokens ?? null } }];`,
+  attempt: r.attempt ?? null, dedup_sim: r.dedup_sim ?? null, prompt_tokens: r.prompt_tokens ?? null, completion_tokens: r.completion_tokens ?? null } }];`,
     }),
   ];
 
@@ -300,7 +364,14 @@ return [{ json: { id, outcome: r.outcome, message: r.message ?? null, error: r.e
   link('Generar pregunta', 'Error LLM', 1);
   link('Validar', '¿Reintentar?');
   link('¿Reintentar?', 'Armar prompt', 0);
-  link('¿Reintentar?', 'Resultado', 1);
+  link('¿Reintentar?', '¿Válida?', 1);
+  link('¿Válida?', 'Embeber pregunta', 0);
+  link('¿Válida?', 'Resultado', 1);
+  link('Embeber pregunta', 'Buscar parecida');
+  link('Buscar parecida', 'Decidir dedup');
+  link('Decidir dedup', '¿Repetida?');
+  link('¿Repetida?', 'Armar prompt', 0);
+  link('¿Repetida?', 'Resultado', 1);
   link('Error LLM', 'Resultado');
   link('Resultado', '¿Pregunta lista?');
   link('¿Pregunta lista?', 'Guardar', 0);
@@ -340,13 +411,18 @@ const r = $json.res ?? { status: 'invalid_data' };
 // Solo se edita el mensaje la primera vez (status ok). Con already_answered
 // el mensaje ya quedó editado por el primer toque: solo se avisa.
 const edit = r.status === 'ok';
+const next = nextButton(r);
 return { json: {
   chat_id: e.chat_id, message_id: e.message_id, callback_query_id: e.callback_query_id,
-  status: r.status, toast: answerToast(r), edit,
+  status: r.status, toast: answerToast(r), edit, test: r.test ?? null,
+  // Progreso que devolvió submit_answer (para depurar y para la simulación de la Fase 5).
+  progress: edit ? { is_correct: r.is_correct, level: r.level, level_changed: r.level_changed, streak: r.streak,
+    interval_days: r.interval_days, next_review_at: r.next_review_at, topic_status: r.topic_status } : null,
+  next_text: next.text, next_data: next.data,
   html: edit ? formatAnsweredMessage({ title: $json.title, level: $json.difficulty, format: $json.format,
-    question: $json.question, options: $json.options }, r) : null,
+    question: $json.question, options: $json.options, origin: $json.origin, test_pos: $json.test_pos }, r) : null,
 } };`,
-    }),
+    }, { notes: 'El botón que queda (nextButton): "Siguiente pregunta (n/3)" en el test, "Siguiente lección" o "Repetir test" al cerrarlo, "Otra pregunta" en el quiz normal.' }),
 
     node('a4', 'Aviso del botón', 'n8n-nodes-base.telegram', 1.2, [660, 0], {
       resource: 'callback', operation: 'answerQuery',
@@ -363,10 +439,10 @@ return { json: {
       messageId: `={{ ${M}.message_id }}`,
       text: `={{ ${M}.html }}`,
       replyMarkup: 'inlineKeyboard',
-      inlineKeyboard: { rows: [{ row: { buttons: [button('Otra pregunta ➡️', 'n:quiz')] } }] },
+      inlineKeyboard: { rows: [{ row: { buttons: [button(`={{ ${M}.next_text }}`, `={{ ${M}.next_data }}`)] } }] },
       additionalFields: { parse_mode: 'HTML', disable_web_page_preview: true },
     }, { credentials: telegram, onError: 'continueRegularOutput',
-      notes: 'Reemplaza los botones A-D por "Otra pregunta" (callback n:quiz → [BS] Generar quiz).' }),
+      notes: 'Reemplaza los botones A-D por un solo botón: n:quiz u h:n:<test_id> → [BS] Generar quiz; n:hoy u h:t:<orden> → [BS] Lección del día.' }),
   ];
 
   const { connections, link } = linker();
@@ -402,7 +478,9 @@ if (b.respuestas?.length) return b.respuestas.map((r) => ({ json: { tema: 'respu
   chat_id: 0, callback_data: 'q:' + r.id + ':' + r.indice, callback_query_id: 'test', message_id: 0 } }));
 const temas = b.temas ?? [];
 if (!temas.length) return [{ json: { error: 'body.temas o body.respuestas vacío' } }];
-return temas.map((t) => ({ json: { tema: t, accion: 'generar', chat_id: 0, dry_run: true, text: '/quiz ' + t, force_level: b.force_level ?? null } }));`,
+// tema "" = sin pista (selección automática); rand fija el 70/30; test_id = pregunta del test de la lección.
+return temas.map((t) => ({ json: { tema: t, accion: 'generar', chat_id: 0, dry_run: true, text: ('/quiz ' + t).trim(),
+  force_level: b.force_level ?? null, rand: b.rand ?? null, test_id: b.test_id ?? null } }));`,
     }),
 
     ifNode('t2b', '¿Responder?', [330, 0], '={{ $json.accion }}', { type: 'string', operation: 'equals' }, 'responder'),
@@ -452,10 +530,84 @@ return [{ json: { results: $input.all().map((i, k) => ({ tema: temas[k], ...i.js
   return { name: '[BS] Test Quiz', nodes, connections, settings: { executionOrder: 'v1', timezone: 'America/Lima' } };
 }
 
+// -----------------------------------------------------------------------------
+// [BS] Medir dedup — calibración del umbral de la deduplicación semántica.
+// Body: { "limit": 45 }. Embebe las preguntas recientes con las variantes A
+// (solo enunciado) y B (con la respuesta correcta) y devuelve el coseno de cada
+// par del mismo chat y tema, de mayor a menor. No escribe nada en la base.
+// -----------------------------------------------------------------------------
+function buildMedirDedup() {
+  const nodes = [
+    node('m1', 'Webhook', 'n8n-nodes-base.webhook', 2.1, [0, 0], {
+      httpMethod: 'POST', path: 'bs-medir-dedup', authentication: 'headerAuth',
+      responseMode: 'responseNode', options: {},
+    }, { credentials: testSecret, notes: 'Header X-BS-Test-Secret. Solo lectura.' }),
+
+    node('m2', 'Preguntas', 'n8n-nodes-base.postgres', 2.7, [220, 0], {
+      operation: 'executeQuery',
+      query: sqlExpr('sql/quiz/05_medir.sql', { __PARAMS_JSON__: 'JSON.stringify($json.body ?? {})' }),
+      options: {},
+    }, { credentials: pg }),
+
+    node('m3', 'Armar lote', 'n8n-nodes-base.code', 2, [440, 0], {
+      mode: 'runOnceForAllItems',
+      jsCode: `${quizLibSrc}
+
+const qs = $input.all().map((i) => i.json);
+const texts = qs.flatMap((q) => [dedupText(q, 'A'), dedupText(q, 'B')]);
+return [{ json: { qs, body: { requests: texts.map((text) => ({
+  model: 'models/${EMBED_MODEL}', content: { parts: [{ text }] }, outputDimensionality: ${EMBED_DIMS} })) } } }];`,
+    }),
+
+    node('m4', 'Embeddings Gemini', 'n8n-nodes-base.httpRequest', 4.5, [660, 0], {
+      method: 'POST',
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:batchEmbedContents`,
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'googlePalmApi',
+      sendBody: true,
+      specifyBody: 'json',
+      jsonBody: '={{ JSON.stringify($json.body) }}',
+      options: { timeout: 120000 },
+    }, { credentials: gemini, retryOnFail: true, maxTries: 3, waitBetweenTries: 5000 }),
+
+    node('m5', 'Similitudes', 'n8n-nodes-base.code', 2, [880, 0], {
+      mode: 'runOnceForAllItems',
+      jsCode: `${quizLibSrc}
+
+const { qs } = $('Armar lote').first().json;
+const embs = $input.first().json.embeddings ?? [];
+if (embs.length !== qs.length * 2) return [{ json: { error: 'embeddings: ' + embs.length + ' de ' + qs.length * 2 } }];
+const short = (q) => String(q.question).slice(0, 140) + ' → ' + String(q.options[q.correct_index]).slice(0, 60);
+const pairs = [];
+for (let i = 0; i < qs.length; i++) for (let j = i + 1; j < qs.length; j++) {
+  if (qs[i].chat_id !== qs[j].chat_id || qs[i].topic_key !== qs[j].topic_key) continue;
+  pairs.push({ topic: qs[i].topic_key,
+    simA: Number(cosine(embs[2 * i].values, embs[2 * j].values).toFixed(4)),
+    simB: Number(cosine(embs[2 * i + 1].values, embs[2 * j + 1].values).toFixed(4)),
+    p1: short(qs[i]), p2: short(qs[j]) });
+}
+pairs.sort((a, b) => b.simB - a.simB);
+return [{ json: { preguntas: qs.length, pares: pairs.length, pairs } }];`,
+    }),
+
+    node('m6', 'Responder', 'n8n-nodes-base.respondToWebhook', 1.5, [1100, 0], {
+      respondWith: 'json', responseBody: '={{ $json }}', options: {},
+    }),
+  ];
+  const { connections, link } = linker();
+  link('Webhook', 'Preguntas');
+  link('Preguntas', 'Armar lote');
+  link('Armar lote', 'Embeddings Gemini');
+  link('Embeddings Gemini', 'Similitudes');
+  link('Similitudes', 'Responder');
+  return { name: '[BS] Medir dedup', nodes, connections, settings: { executionOrder: 'v1', timezone: 'America/Lima' } };
+}
+
 const outDir = arg('out-dir');
 fs.mkdirSync(path.join(root, outDir), { recursive: true });
 const write = (f, w) => fs.writeFileSync(path.join(root, outDir, f), JSON.stringify(w, null, 2));
 write('quiz-generar.json', buildGenerar());
 write('quiz-responder.json', buildResponder());
 write('quiz-test.json', buildTestQuiz());
+write('quiz-medir.json', buildMedirDedup());
 console.log(`Escritos ${outDir}/quiz-generar.json, quiz-responder.json y quiz-test.json`);
