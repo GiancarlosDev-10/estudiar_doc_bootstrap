@@ -1,0 +1,186 @@
+{
+  "name": "[BS] Setup DB",
+  "nodes": [
+    {
+      "id": "s0",
+      "name": "Ejecutar setup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "s1",
+      "name": "001_schema.sql",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- 001_schema.sql — Esquema del bot de estudio de Bootstrap 5.3\n-- Base: bootstrap_bot (contenedor bs-pgvector, Postgres 16 + pgvector)\n--\n-- Idempotente: se puede ejecutar varias veces sin error ni pérdida de datos.\n-- Ojo: \"IF NOT EXISTS\" no modifica una tabla que ya existe. Cualquier cambio\n-- de columnas posterior va en una migración nueva (002_..., 003_...).\n-- =============================================================================\n\nBEGIN;\n\nCREATE EXTENSION IF NOT EXISTS vector;\n\n-- -----------------------------------------------------------------------------\n-- study_path: la ruta de estudio, en el orden oficial de la documentación\n-- (Getting started → Customize → Layout → Content → Forms → Components →\n--  Helpers → Utilities). La rellena la ingesta (Fase 2).\n--\n-- topic_key = '<section>/<page>' es la clave de \"tema\" en todo el esquema.\n-- No basta con page: hay páginas con el mismo nombre en secciones distintas\n-- (p. ej. forms/overview y customize/overview).\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS study_path (\n  topic_key   text PRIMARY KEY,\n  order_index int  NOT NULL UNIQUE,\n  section     text NOT NULL,\n  page        text NOT NULL,\n  title       text NOT NULL,\n  url         text NOT NULL,\n  CONSTRAINT study_path_topic_key_chk CHECK (topic_key = section || '/' || page)\n);\n\n-- -----------------------------------------------------------------------------\n-- doc_chunks: fragmentos de la documentación con su embedding.\n--\n-- Compatibilidad con el nodo \"Postgres PGVector Store\" de n8n: el nodo solo\n-- lee/escribe id, contenido, metadata y embedding (nombres configurables en\n-- sus opciones: contentColumnName = 'content'). Por eso la info útil se guarda\n-- DOS veces: en columnas reales (para SQL, filtros e índices) y en metadata\n-- (para que el nodo la devuelva con cada fragmento recuperado). La ingesta\n-- (Fase 2) escribe con nuestro propio INSERT y rellena ambas.\n--\n-- embedding admite NULL para poder insertar el texto y calcular el vector\n-- en un segundo paso; la búsqueda ignora las filas sin embedding.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS doc_chunks (\n  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  content      text NOT NULL,\n  embedding    vector(1536),              -- text-embedding-3-small; cambiar el modelo obliga a reindexar\n  metadata     jsonb NOT NULL DEFAULT '{}'::jsonb,\n  section      text NOT NULL,\n  page         text NOT NULL,\n  topic_key    text GENERATED ALWAYS AS (section || '/' || page) STORED,\n  heading_path text[] NOT NULL DEFAULT '{}',  -- p. ej. {'Grid system','Auto-layout columns'}\n  url          text NOT NULL,             -- URL oficial con #ancla; la cita sale de aquí, nunca del LLM\n  order_index  int  NOT NULL,             -- posición del fragmento dentro de su página\n  has_code     boolean NOT NULL DEFAULT false,\n  source_path  text NOT NULL,             -- ruta del archivo en twbs/bootstrap\n  content_hash text NOT NULL,             -- sha256 del contenido: reindexar solo lo que cambió\n  version      text NOT NULL,             -- tag de Bootstrap, p. ej. 'v5.3.8'\n  created_at   timestamptz NOT NULL DEFAULT now(),\n  updated_at   timestamptz NOT NULL DEFAULT now(),\n  CONSTRAINT doc_chunks_source_order_uq UNIQUE (source_path, order_index)\n);\n\n-- HNSW por coseno: búsqueda aproximada rápida sin tener que \"entrenar\" el\n-- índice (a diferencia de IVFFlat, que necesita datos previos para sus listas).\nCREATE INDEX IF NOT EXISTS doc_chunks_embedding_hnsw\n  ON doc_chunks USING hnsw (embedding vector_cosine_ops);\nCREATE INDEX IF NOT EXISTS doc_chunks_topic_idx ON doc_chunks (topic_key);\n\n-- -----------------------------------------------------------------------------\n-- topic_progress: modelo de progreso por (chat, tema).\n--\n-- streak tiene signo: > 0 aciertos seguidos, < 0 fallos seguidos. Así una sola\n-- columna sirve para \"3 aciertos seguidos sube\" y \"2 fallos seguidos baja\".\n-- interval_days: intervalo actual de la repetición espaciada (acierto ×2,\n-- fallo → 1). Hace falta guardarlo para poder duplicarlo.\n-- passed_at: cuándo el tema quedó \"visto\" en la ruta (lógica en la Fase 5).\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS topic_progress (\n  chat_id        bigint NOT NULL,\n  topic_key      text   NOT NULL REFERENCES study_path (topic_key),\n  correct        int    NOT NULL DEFAULT 0,\n  wrong          int    NOT NULL DEFAULT 0,\n  streak         int    NOT NULL DEFAULT 0,\n  level          text   NOT NULL DEFAULT 'basico'\n                 CHECK (level IN ('basico', 'intermedio', 'avanzado')),\n  interval_days  int    NOT NULL DEFAULT 1 CHECK (interval_days >= 1),\n  last_seen_at   timestamptz,\n  next_review_at timestamptz,\n  status         text   NOT NULL DEFAULT 'pendiente'\n                 CHECK (status IN ('pendiente', 'en_curso', 'dominado')),\n  passed_at      timestamptz,\n  PRIMARY KEY (chat_id, topic_key)\n);\n\n-- Para \"¿qué repasos están vencidos?\" (selección del tema del quiz y Schedule).\nCREATE INDEX IF NOT EXISTS topic_progress_review_idx\n  ON topic_progress (chat_id, next_review_at);\n\n-- -----------------------------------------------------------------------------\n-- quiz_questions: cada pregunta generada y su respuesta.\n--\n-- Corrección respecto a app-ure: tema (topic_key) y fuente (source_url) van en\n-- columnas, no dentro de un texto que luego se lee con regex.\n-- question_embedding: deduplicación semántica (coseno > 0,92 contra las\n-- preguntas recientes del mismo tema → se descarta).\n-- origin: de dónde salió la pregunta; la regla de \"tema visto\" (2 de 3 en /hoy)\n-- solo cuenta las de origin = 'hoy'.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS quiz_questions (\n  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  chat_id            bigint NOT NULL,\n  topic_key          text   NOT NULL REFERENCES study_path (topic_key),\n  origin             text   NOT NULL DEFAULT 'quiz' CHECK (origin IN ('quiz', 'hoy', 'repaso')),\n  chunk_ids          uuid[] NOT NULL DEFAULT '{}',\n  difficulty         text   NOT NULL CHECK (difficulty IN ('basico', 'intermedio', 'avanzado')),\n  format             text   NOT NULL CHECK (format IN ('multiple', 'cloze')),\n  question           text   NOT NULL,\n  options            jsonb  NOT NULL,\n  correct_index      smallint NOT NULL,\n  explanation        text   NOT NULL,\n  source_url         text   NOT NULL,\n  question_embedding vector(1536),\n  user_answer_index  smallint,\n  is_correct         boolean,\n  answered_at        timestamptz,\n  model              text,\n  prompt_tokens      int,\n  completion_tokens  int,\n  created_at         timestamptz NOT NULL DEFAULT now(),\n  CONSTRAINT quiz_options_chk\n    CHECK (jsonb_typeof(options) = 'array' AND jsonb_array_length(options) BETWEEN 2 AND 4),\n  CONSTRAINT quiz_correct_index_chk\n    CHECK (correct_index >= 0 AND correct_index < jsonb_array_length(options)),\n  -- respondida = las tres columnas llenas; sin responder = las tres vacías\n  CONSTRAINT quiz_answer_consistency_chk\n    CHECK ((answered_at IS NULL) = (user_answer_index IS NULL)\n       AND (answered_at IS NULL) = (is_correct IS NULL))\n);\n\n-- Preguntas recientes por tema: dedup semántico y regla de \"dominado\".\nCREATE INDEX IF NOT EXISTS quiz_questions_topic_recent_idx\n  ON quiz_questions (chat_id, topic_key, created_at DESC);\n\n-- -----------------------------------------------------------------------------\n-- submit_answer: registra una respuesta de forma atómica.\n-- (Versión de la Fase 1. La vigente, con el test de la lección, está en\n--  004_fase5.sql, que se ejecuta después y la reemplaza.)\n--\n-- FOR UPDATE bloquea la fila de la pregunta: si llegan dos toques del mismo\n-- botón casi a la vez (doble toque en Telegram), el segundo espera al primero,\n-- ve answered_at ya relleno y devuelve 'already_answered' sin volver a contar.\n--\n-- Devuelve jsonb con status: ok | already_answered | forbidden | not_found | invalid_index\n-- y, cuando corresponde, el resultado y el progreso actualizado.\n--\n-- Reglas (definidas en CLAUDE.md y acordadas en la Fase 1):\n--   acierto → streak +1 (o 1 si venía negativo), intervalo ×2 (tope 60 días)\n--   fallo   → streak −1 (o −1 si venía positivo), intervalo = 1 día\n--   streak ≥ 3  → sube un nivel y streak = 0\n--   streak ≤ −2 → baja un nivel y streak = 0\n--   dominado = nivel avanzado, ≥ 5 respuestas y ≥ 4 aciertos en las últimas 5 (80 %)\n-- El tope de 60 días evita que un tema desaparezca meses del repaso.\n-- -----------------------------------------------------------------------------\nCREATE OR REPLACE FUNCTION submit_answer(\n  p_question_id    uuid,\n  p_chat_id        bigint,\n  p_selected_index int\n) RETURNS jsonb\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  q           quiz_questions%ROWTYPE;\n  p           topic_progress%ROWTYPE;\n  v_correct   boolean;\n  v_old_level text;\n  v_n         int;\n  v_ok        int;\nBEGIN\n  SELECT * INTO q FROM quiz_questions WHERE id = p_question_id FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RETURN jsonb_build_object('status', 'not_found');\n  END IF;\n\n  -- Validar dueño antes que nada: no revelar datos de preguntas ajenas.\n  IF q.chat_id <> p_chat_id THEN\n    RETURN jsonb_build_object('status', 'forbidden');\n  END IF;\n\n  IF q.answered_at IS NOT NULL THEN\n    RETURN jsonb_build_object(\n      'status',         'already_answered',\n      'is_correct',     q.is_correct,\n      'selected_index', q.user_answer_index,\n      'correct_index',  q.correct_index,\n      'explanation',    q.explanation,\n      'source_url',     q.source_url\n    );\n  END IF;\n\n  IF p_selected_index IS NULL\n     OR p_selected_index < 0\n     OR p_selected_index >= jsonb_array_length(q.options) THEN\n    RETURN jsonb_build_object('status', 'invalid_index');\n  END IF;\n\n  v_correct := (p_selected_index = q.correct_index);\n\n  UPDATE quiz_questions\n     SET user_answer_index = p_selected_index,\n         is_correct        = v_correct,\n         answered_at       = now()\n   WHERE id = q.id;\n\n  -- Crear la fila de progreso si es la primera respuesta de este tema.\n  INSERT INTO topic_progress (chat_id, topic_key)\n  VALUES (p_chat_id, q.topic_key)\n  ON CONFLICT (chat_id, topic_key) DO NOTHING;\n\n  SELECT * INTO p\n    FROM topic_progress\n   WHERE chat_id = p_chat_id AND topic_key = q.topic_key\n     FOR UPDATE;\n\n  v_old_level := p.level;\n\n  IF v_correct THEN\n    p.correct       := p.correct + 1;\n    p.streak        := CASE WHEN p.streak > 0 THEN p.streak + 1 ELSE 1 END;\n    p.interval_days := LEAST(p.interval_days * 2, 60);\n  ELSE\n    p.wrong         := p.wrong + 1;\n    p.streak        := CASE WHEN p.streak < 0 THEN p.streak - 1 ELSE -1 END;\n    p.interval_days := 1;\n  END IF;\n\n  -- Dificultad adaptativa.\n  IF p.streak >= 3 AND p.level <> 'avanzado' THEN\n    p.level  := CASE p.level WHEN 'basico' THEN 'intermedio' ELSE 'avanzado' END;\n    p.streak := 0;\n  ELSIF p.streak <= -2 AND p.level <> 'basico' THEN\n    p.level  := CASE p.level WHEN 'avanzado' THEN 'intermedio' ELSE 'basico' END;\n    p.streak := 0;\n  END IF;\n\n  -- Últimas 5 respuestas del tema (incluye la que se acaba de guardar).\n  SELECT count(*), count(*) FILTER (WHERE t.is_correct)\n    INTO v_n, v_ok\n    FROM (SELECT is_correct\n            FROM quiz_questions\n           WHERE chat_id = p_chat_id\n             AND topic_key = q.topic_key\n             AND answered_at IS NOT NULL\n           ORDER BY answered_at DESC\n           LIMIT 5) t;\n\n  p.status := CASE\n                WHEN p.level = 'avanzado' AND v_n >= 5 AND v_ok >= 4 THEN 'dominado'\n                ELSE 'en_curso'\n              END;\n\n  UPDATE topic_progress\n     SET correct        = p.correct,\n         wrong          = p.wrong,\n         streak         = p.streak,\n         level          = p.level,\n         interval_days  = p.interval_days,\n         status         = p.status,\n         last_seen_at   = now(),\n         next_review_at = now() + make_interval(days => p.interval_days)\n   WHERE chat_id = p_chat_id AND topic_key = q.topic_key;\n\n  RETURN jsonb_build_object(\n    'status',         'ok',\n    'is_correct',     v_correct,\n    'selected_index', p_selected_index,\n    'correct_index',  q.correct_index,\n    'explanation',    q.explanation,\n    'source_url',     q.source_url,\n    'topic_key',      q.topic_key,\n    'level',          p.level,\n    'level_changed',  p.level <> v_old_level,\n    'streak',         p.streak,\n    'interval_days',  p.interval_days,\n    'next_review_at', now() + make_interval(days => p.interval_days),\n    'topic_status',   p.status\n  );\nEND;\n$$;\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Copia de sql/001_schema.sql (el repo es la fuente de verdad). Idempotente."
+    },
+    {
+      "id": "s2",
+      "name": "002_rag_log.sql",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- 002_rag_log.sql — Fase 3: registro de preguntas libres (RAG)\n-- Base: bootstrap_bot\n--\n-- Idempotente, igual que 001_schema.sql. Se aplica DESPUÉS de 001 (usa gen_random_uuid,\n-- ya habilitado por pgcrypto/pgvector ahí).\n-- =============================================================================\n\nBEGIN;\n\n-- -----------------------------------------------------------------------------\n-- rag_queries: cada pregunta libre respondida (o no) por el RAG.\n--\n-- Cumple dos funciones:\n--   1. Registro para medir costo, latencia y calidad (Fase 6).\n--   2. Memoria corta del chat: el nodo \"Historial\" de [BS] Pregunta libre (RAG)\n--      lee las últimas filas de un chat_id en vez de usar Postgres Chat Memory,\n--      para no mantener dos historiales distintos.\n--\n-- search_query es la pregunta ya reescrita como autónoma (o la original si no\n-- había historial o la reescritura falló): es lo que de verdad se embebió.\n-- chunk_ids + similarities quedan alineados por posición (fragmento 1..6).\n-- v4_retry marca si el validador de sintaxis de Bootstrap 4 forzó un reintento,\n-- para poder revisar esos casos a mano.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS rag_queries (\n  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  chat_id            bigint NOT NULL,\n  source             text   NOT NULL DEFAULT 'telegram' CHECK (source IN ('telegram', 'eval')),\n  question           text   NOT NULL,\n  search_query       text   NOT NULL,\n  outcome            text   NOT NULL CHECK (outcome IN ('answered', 'no_context', 'error')),\n  answer             text,\n  chunk_ids          uuid[] NOT NULL DEFAULT '{}',\n  similarities       real[] NOT NULL DEFAULT '{}',\n  top_similarity     real,\n  cited_urls         text[] NOT NULL DEFAULT '{}',\n  v4_retry           boolean NOT NULL DEFAULT false,\n  model              text,\n  prompt_tokens      int,\n  completion_tokens  int,\n  latency_ms         int,\n  created_at         timestamptz NOT NULL DEFAULT now()\n);\n\n-- Historial corto por chat (memoria) y consultas de costo/calidad por fecha.\nCREATE INDEX IF NOT EXISTS rag_queries_chat_recent_idx\n  ON rag_queries (chat_id, created_at DESC);\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Copia de sql/002_rag_log.sql (el repo es la fuente de verdad). Idempotente."
+    },
+    {
+      "id": "s3",
+      "name": "003_quiz_botones.sql",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- 003_quiz_botones.sql — Fase 4: el botón \"Otra pregunta\" cuenta una sola vez\n-- Base: bootstrap_bot\n--\n-- Idempotente, igual que 001 y 002. Se aplica después de ellas.\n-- =============================================================================\n\nBEGIN;\n\n-- -----------------------------------------------------------------------------\n-- quiz_next_clicks: qué botones \"Otra pregunta\" ya se usaron.\n--\n-- Por qué existe: un doble toque rápido en \"Otra pregunta\" puede llegar como\n-- dos callbacks casi simultáneos, y las dos ejecuciones de [BS] Generar quiz\n-- generarían dos preguntas casi iguales. Las respuestas A-D ya estaban\n-- protegidas por submit_answer (FOR UPDATE); este botón no tenía nada que bloquear.\n--\n-- El botón vive en un mensaje concreto, así que (chat_id, message_id) lo\n-- identifica. \"Reclamar botón\" hace INSERT … ON CONFLICT DO NOTHING: la clave\n-- primaria garantiza que solo UNA ejecución inserta la fila, aunque lleguen a\n-- la vez; la otra no inserta nada y termina sin generar.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS quiz_next_clicks (\n  chat_id     bigint      NOT NULL,\n  message_id  bigint      NOT NULL,\n  created_at  timestamptz NOT NULL DEFAULT now(),\n  PRIMARY KEY (chat_id, message_id)\n);\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Copia de sql/003_quiz_botones.sql (el repo es la fuente de verdad). Idempotente."
+    },
+    {
+      "id": "s4",
+      "name": "004_fase5.sql",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- 004_fase5.sql — Fase 5: estudio guiado (/hoy, test de la lección, envío\n-- diario, /progreso) y la versión final de submit_answer.\n-- Base: bootstrap_bot\n--\n-- Idempotente, igual que 001-003. Se aplica después de ellas: 001 vuelve a\n-- crear la versión anterior de submit_answer y esta la reemplaza.\n-- =============================================================================\n\nBEGIN;\n\n-- -----------------------------------------------------------------------------\n-- topic_progress.passed_by: cómo quedó \"visto\" un tema en la ruta.\n--   test   = aprobó el test de la lección (2 de 3)\n--   saltar = lo dio por visto con \"Ya lo sé\" o /saltar\n-- /progreso los cuenta igual (el tema ya no bloquea la ruta), pero así se\n-- puede distinguir lo aprobado de lo saltado.\n-- -----------------------------------------------------------------------------\nALTER TABLE topic_progress ADD COLUMN IF NOT EXISTS passed_by text;\nDO $$ BEGIN\n  ALTER TABLE topic_progress ADD CONSTRAINT topic_progress_passed_by_chk\n    CHECK (passed_by IS NULL OR passed_by IN ('test', 'saltar'));\nEXCEPTION WHEN duplicate_object THEN NULL; END $$;\n\n-- -----------------------------------------------------------------------------\n-- lessons: caché de la lección de cada tema (decisión de la Fase 5: una por\n-- tema, la misma para todos los niveles). Se genera la primera vez que alguien\n-- pide /hoy de ese tema y se reutiliza: el LLM se paga una vez por tema.\n-- source_hash: hash de los fragmentos usados; si la ingesta cambia el texto de\n-- la página, el hash deja de coincidir y la lección se regenera.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS lessons (\n  topic_key         text PRIMARY KEY REFERENCES study_path (topic_key),\n  markdown          text NOT NULL,\n  source_hash       text NOT NULL,\n  model             text,\n  prompt_tokens     int,\n  completion_tokens int,\n  created_at        timestamptz NOT NULL DEFAULT now()\n);\n\n-- -----------------------------------------------------------------------------\n-- lesson_tests: un intento del test de la lección (\"Ponerme a prueba\").\n-- Son 3 preguntas del tema; con 2 aciertos el tema queda visto y la ruta\n-- avanza (regla acordada en la Fase 1). Las preguntas apuntan aquí por\n-- quiz_questions.test_id, así \"2 de 3\" se cuenta dentro de UN intento y no\n-- mezcla respuestas de intentos anteriores.\n-- message_id: el mensaje cuyo botón inició el test (para frenar el doble toque).\n-- abandoned: se empezó otro test antes de terminar este.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS lesson_tests (\n  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  chat_id     bigint NOT NULL,\n  topic_key   text   NOT NULL REFERENCES study_path (topic_key),\n  message_id  bigint,\n  created_at  timestamptz NOT NULL DEFAULT now(),\n  finished_at timestamptz,\n  n_correct   int,\n  passed      boolean,\n  abandoned   boolean NOT NULL DEFAULT false\n);\nCREATE INDEX IF NOT EXISTS lesson_tests_chat_idx ON lesson_tests (chat_id, created_at DESC);\n\nALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS test_id uuid REFERENCES lesson_tests (id);\nCREATE INDEX IF NOT EXISTS quiz_questions_test_idx ON quiz_questions (test_id) WHERE test_id IS NOT NULL;\n\n-- -----------------------------------------------------------------------------\n-- bot_settings: a qué horas (America/Lima) llega el envío diario.\n-- La primera hora del día es la de la lección; las demás, repaso o recordatorio\n-- (ver sql/diario/01_turnos.sql). La fila se crea la primera vez que el chat\n-- usa /hoy o /hora: el repo no guarda ningún chat_id.\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS bot_settings (\n  chat_id    bigint PRIMARY KEY,\n  hours      int[]  NOT NULL DEFAULT '{10,20}',\n  enabled    boolean NOT NULL DEFAULT true,\n  updated_at timestamptz NOT NULL DEFAULT now(),\n  CONSTRAINT bot_settings_hours_chk CHECK (cardinality(hours) BETWEEN 1 AND 4 AND 0 <= ALL (hours) AND 23 >= ALL (hours))\n);\n\n-- -----------------------------------------------------------------------------\n-- schedule_runs: qué turnos ya se enviaron. El Schedule corre cada hora; la\n-- clave primaria garantiza un solo envío por chat, día y hora aunque el\n-- workflow se ejecute dos veces (reinicio de n8n, ejecución manual).\n-- -----------------------------------------------------------------------------\nCREATE TABLE IF NOT EXISTS schedule_runs (\n  chat_id    bigint NOT NULL,\n  run_on     date   NOT NULL,   -- fecha en America/Lima\n  hour       int    NOT NULL,\n  action     text   NOT NULL,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  PRIMARY KEY (chat_id, run_on, hour)\n);\n\n-- -----------------------------------------------------------------------------\n-- current_topic: el tema \"actual\" de la ruta = el primero (por order_index)\n-- que el chat todavía no tiene visto. Solo temas de la ruta (order_index >= 0)\n-- y con fragmentos indexados. NULL = ruta terminada.\n-- -----------------------------------------------------------------------------\nCREATE OR REPLACE FUNCTION current_topic(p_chat_id bigint) RETURNS text\nLANGUAGE sql STABLE\nAS $$\n  SELECT sp.topic_key\n    FROM study_path sp\n   WHERE sp.order_index >= 0\n     AND EXISTS (SELECT 1 FROM doc_chunks c WHERE c.topic_key = sp.topic_key AND c.embedding IS NOT NULL)\n     AND NOT EXISTS (SELECT 1 FROM topic_progress tp\n                      WHERE tp.chat_id = p_chat_id AND tp.topic_key = sp.topic_key AND tp.passed_at IS NOT NULL)\n   ORDER BY sp.order_index\n   LIMIT 1;\n$$;\n\n-- -----------------------------------------------------------------------------\n-- start_lesson_test: crea un intento del test de la lección.\n--\n-- Doble toque en \"Ponerme a prueba\": los dos callbacks llegan casi a la vez.\n-- El candado de asesoría por chat (pg_advisory_xact_lock) los pone en fila; el\n-- segundo ve el intento que acaba de crear el primero con el mismo message_id\n-- (menos de 30 s) y devuelve 'duplicate'. No se usa una clave única sobre\n-- message_id porque, después de fallar, volver a tocar el mismo botón de la\n-- lección SÍ debe empezar un intento nuevo.\n-- Un intento sin terminar del mismo chat queda abandonado: solo hay uno vivo.\n-- -----------------------------------------------------------------------------\nCREATE OR REPLACE FUNCTION start_lesson_test(\n  p_chat_id    bigint,\n  p_topic_key  text,\n  p_message_id bigint\n) RETURNS jsonb\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  v_id uuid;\nBEGIN\n  PERFORM pg_advisory_xact_lock(hashtextextended('lesson_test:' || p_chat_id, 0));\n\n  IF NOT EXISTS (SELECT 1 FROM study_path WHERE topic_key = p_topic_key) THEN\n    RETURN jsonb_build_object('status', 'not_found');\n  END IF;\n\n  IF EXISTS (SELECT 1 FROM lesson_tests\n              WHERE chat_id = p_chat_id\n                AND message_id IS NOT DISTINCT FROM p_message_id\n                AND created_at > now() - interval '30 seconds') THEN\n    RETURN jsonb_build_object('status', 'duplicate');\n  END IF;\n\n  UPDATE lesson_tests\n     SET finished_at = now(), passed = false, abandoned = true\n   WHERE chat_id = p_chat_id AND finished_at IS NULL;\n\n  INSERT INTO lesson_tests (chat_id, topic_key, message_id)\n  VALUES (p_chat_id, p_topic_key, p_message_id)\n  RETURNING id INTO v_id;\n\n  RETURN jsonb_build_object('status', 'ok', 'test_id', v_id, 'topic_key', p_topic_key);\nEND;\n$$;\n\n-- -----------------------------------------------------------------------------\n-- submit_answer: misma función de 001_schema.sql (FOR UPDATE, dificultad\n-- adaptativa, repetición espaciada) + el test de la lección:\n--\n-- Si la pregunta es de un test (test_id), al responder la 3.ª se cierra el\n-- intento; con 2 aciertos o más, el tema queda visto (passed_at) y la ruta\n-- avanza. El resultado trae un objeto \"test\" con el avance del intento y,\n-- solo en la respuesta que lo cierra, just_finished = true (para que el\n-- mensaje de \"test superado\" salga una vez, aunque haya doble toque).\n-- -----------------------------------------------------------------------------\nCREATE OR REPLACE FUNCTION submit_answer(\n  p_question_id    uuid,\n  p_chat_id        bigint,\n  p_selected_index int\n) RETURNS jsonb\nLANGUAGE plpgsql\nAS $$\nDECLARE\n  q           quiz_questions%ROWTYPE;\n  p           topic_progress%ROWTYPE;\n  t           lesson_tests%ROWTYPE;\n  v_correct   boolean;\n  v_old_level text;\n  v_n         int;\n  v_ok        int;\n  v_test      jsonb := NULL;\n  v_tn        int;\n  v_tok       int;\n  v_just      boolean := false;\nBEGIN\n  SELECT * INTO q FROM quiz_questions WHERE id = p_question_id FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RETURN jsonb_build_object('status', 'not_found');\n  END IF;\n\n  -- Validar dueño antes que nada: no revelar datos de preguntas ajenas.\n  IF q.chat_id <> p_chat_id THEN\n    RETURN jsonb_build_object('status', 'forbidden');\n  END IF;\n\n  IF q.answered_at IS NOT NULL THEN\n    RETURN jsonb_build_object(\n      'status',         'already_answered',\n      'is_correct',     q.is_correct,\n      'selected_index', q.user_answer_index,\n      'correct_index',  q.correct_index,\n      'explanation',    q.explanation,\n      'source_url',     q.source_url\n    );\n  END IF;\n\n  IF p_selected_index IS NULL\n     OR p_selected_index < 0\n     OR p_selected_index >= jsonb_array_length(q.options) THEN\n    RETURN jsonb_build_object('status', 'invalid_index');\n  END IF;\n\n  v_correct := (p_selected_index = q.correct_index);\n\n  UPDATE quiz_questions\n     SET user_answer_index = p_selected_index,\n         is_correct        = v_correct,\n         answered_at       = now()\n   WHERE id = q.id;\n\n  -- Crear la fila de progreso si es la primera respuesta de este tema.\n  INSERT INTO topic_progress (chat_id, topic_key)\n  VALUES (p_chat_id, q.topic_key)\n  ON CONFLICT (chat_id, topic_key) DO NOTHING;\n\n  SELECT * INTO p\n    FROM topic_progress\n   WHERE chat_id = p_chat_id AND topic_key = q.topic_key\n     FOR UPDATE;\n\n  v_old_level := p.level;\n\n  IF v_correct THEN\n    p.correct       := p.correct + 1;\n    p.streak        := CASE WHEN p.streak > 0 THEN p.streak + 1 ELSE 1 END;\n    p.interval_days := LEAST(p.interval_days * 2, 60);\n  ELSE\n    p.wrong         := p.wrong + 1;\n    p.streak        := CASE WHEN p.streak < 0 THEN p.streak - 1 ELSE -1 END;\n    p.interval_days := 1;\n  END IF;\n\n  -- Dificultad adaptativa.\n  IF p.streak >= 3 AND p.level <> 'avanzado' THEN\n    p.level  := CASE p.level WHEN 'basico' THEN 'intermedio' ELSE 'avanzado' END;\n    p.streak := 0;\n  ELSIF p.streak <= -2 AND p.level <> 'basico' THEN\n    p.level  := CASE p.level WHEN 'avanzado' THEN 'intermedio' ELSE 'basico' END;\n    p.streak := 0;\n  END IF;\n\n  -- Últimas 5 respuestas del tema (incluye la que se acaba de guardar).\n  SELECT count(*), count(*) FILTER (WHERE x.is_correct)\n    INTO v_n, v_ok\n    FROM (SELECT is_correct\n            FROM quiz_questions\n           WHERE chat_id = p_chat_id\n             AND topic_key = q.topic_key\n             AND answered_at IS NOT NULL\n           ORDER BY answered_at DESC\n           LIMIT 5) x;\n\n  p.status := CASE\n                WHEN p.level = 'avanzado' AND v_n >= 5 AND v_ok >= 4 THEN 'dominado'\n                ELSE 'en_curso'\n              END;\n\n  UPDATE topic_progress\n     SET correct        = p.correct,\n         wrong          = p.wrong,\n         streak         = p.streak,\n         level          = p.level,\n         interval_days  = p.interval_days,\n         status         = p.status,\n         last_seen_at   = now(),\n         next_review_at = now() + make_interval(days => p.interval_days)\n   WHERE chat_id = p_chat_id AND topic_key = q.topic_key;\n\n  -- Test de la lección: 3 preguntas, aprobado con 2 aciertos.\n  IF q.test_id IS NOT NULL THEN\n    SELECT * INTO t FROM lesson_tests WHERE id = q.test_id FOR UPDATE;\n\n    SELECT count(*), count(*) FILTER (WHERE is_correct)\n      INTO v_tn, v_tok\n      FROM quiz_questions\n     WHERE test_id = q.test_id AND answered_at IS NOT NULL;\n\n    IF t.finished_at IS NULL AND v_tn >= 3 THEN\n      v_just := true;\n      t.finished_at := now();\n      t.n_correct   := v_tok;\n      t.passed      := v_tok >= 2;\n      UPDATE lesson_tests\n         SET finished_at = t.finished_at, n_correct = t.n_correct, passed = t.passed\n       WHERE id = t.id;\n\n      IF t.passed THEN\n        UPDATE topic_progress\n           SET passed_at = coalesce(passed_at, now()),\n               passed_by = coalesce(passed_by, 'test')\n         WHERE chat_id = p_chat_id AND topic_key = q.topic_key;\n      END IF;\n    END IF;\n\n    v_test := jsonb_build_object(\n      'test_id',       t.id,\n      'answered',      v_tn,\n      'correct',       v_tok,\n      'total',         3,\n      'finished',      t.finished_at IS NOT NULL,\n      'just_finished', v_just,\n      'passed',        coalesce(t.passed, false),\n      'abandoned',     t.abandoned,\n      -- order_index del tema del test: \"Repetir test\" vuelve a empezarlo.\n      'topic_order',   (SELECT order_index FROM study_path WHERE topic_key = q.topic_key),\n      'next_topic',    (SELECT title FROM study_path WHERE topic_key = current_topic(p_chat_id))\n    );\n  END IF;\n\n  RETURN jsonb_build_object(\n    'status',         'ok',\n    'is_correct',     v_correct,\n    'selected_index', p_selected_index,\n    'correct_index',  q.correct_index,\n    'explanation',    q.explanation,\n    'source_url',     q.source_url,\n    'topic_key',      q.topic_key,\n    'level',          p.level,\n    'level_changed',  p.level <> v_old_level,\n    'streak',         p.streak,\n    'interval_days',  p.interval_days,\n    'next_review_at', now() + make_interval(days => p.interval_days),\n    'topic_status',   p.status,\n    'test',           v_test\n  );\nEND;\n$$;\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Copia de sql/004_fase5.sql (el repo es la fuente de verdad). Idempotente."
+    },
+    {
+      "id": "sv",
+      "name": "Verificar esquema",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 'tabla' AS tipo, table_name AS nombre\n  FROM information_schema.tables\n WHERE table_schema = 'public'\n   AND table_name IN ('study_path', 'doc_chunks', 'topic_progress', 'quiz_questions', 'rag_queries', 'quiz_next_clicks',\n                      'lessons', 'lesson_tests', 'bot_settings', 'schedule_runs')\nUNION ALL\nSELECT 'funcion', routine_name\n  FROM information_schema.routines\n WHERE routine_schema = 'public' AND routine_name IN ('submit_answer', 'current_topic', 'start_lesson_test')\nUNION ALL\nSELECT 'columna', table_name || '.' || column_name\n  FROM information_schema.columns\n WHERE table_schema = 'public'\n   AND (table_name, column_name) IN (('quiz_questions', 'test_id'), ('topic_progress', 'passed_by'))\nUNION ALL\nSELECT 'indice', indexname\n  FROM pg_indexes\n WHERE schemaname = 'public' AND indexname IN ('doc_chunks_embedding_hnsw', 'rag_queries_chat_recent_idx', 'quiz_next_clicks_pkey')\nORDER BY 1, 2;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Ejecutar setup": {
+      "main": [
+        [
+          {
+            "node": "001_schema.sql",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "001_schema.sql": {
+      "main": [
+        [
+          {
+            "node": "002_rag_log.sql",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "002_rag_log.sql": {
+      "main": [
+        [
+          {
+            "node": "003_quiz_botones.sql",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "003_quiz_botones.sql": {
+      "main": [
+        [
+          {
+            "node": "004_fase5.sql",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "004_fase5.sql": {
+      "main": [
+        [
+          {
+            "node": "Verificar esquema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

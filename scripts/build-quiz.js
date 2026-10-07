@@ -5,14 +5,18 @@
 //
 // Uso:
 //   node scripts/build-quiz.js --postgres <credId> --telegram <credId> \
-//     --openai <credId> --testSecret <credId> --gemini <credId> --out-dir tmp
+//     --openai <credId> --testSecret <credId> --gemini <credId> \
+//     --ids <archivo.json> --out-dir tmp
+// --ids: { generar, responder } con los IDs de estos dos workflows (los usa
+// [BS] Test Quiz para invocarlos). No son secretos; el primer despliegue los
+// crea y los anota ahí.
 // Los IDs de credencial se pasan por argumento: nunca se guardan en el repo.
 //
-// Versión liviana de la Fase 4 (acordada con el usuario el 2026-10-03):
-// - solo un modelo OpenAI, con un reintento HTTP; sin cadena de respaldo Gemini;
-// - el prompt recibe las últimas 5 preguntas del tema y, desde la Fase 5, además
-//   hay deduplicación semántica por embedding (umbral calibrado, eval/fase5-dedup.json);
-// - sí: validación por código con un reintento, y opciones barajadas por código.
+// Versión liviana de la Fase 4: un solo modelo OpenAI con un reintento HTTP
+// (sin cadena de respaldo Gemini); el prompt recibe las últimas 5 preguntas
+// del tema y hay deduplicación semántica por embedding (umbral calibrado,
+// eval/fase5-dedup.json); validación por código con un reintento, y opciones
+// barajadas por código.
 // =============================================================================
 const fs = require('fs');
 const path = require('path');
@@ -25,15 +29,18 @@ const arg = (name) => {
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-// El mismo modelo principal que la Pregunta libre. Cambiado a gpt-4o-mini el
-// 2026-10-07 (decisión del usuario, por costo: ~5× más barato que
-// gpt-5.4-mini; es un bot de prueba personal, no producción). El formato del
-// quiz lo valida el código con un reintento, no depende de la "inteligencia"
-// del modelo.
+// El mismo modelo principal que la Pregunta libre, elegido por costo (ver
+// build-pregunta.js y eval/fase6-conclusion.md). El formato del quiz lo valida
+// el código con un reintento, no depende de la "inteligencia" del modelo.
 const QUIZ_MODEL = 'gpt-4o-mini';
 // IDs de los workflows del quiz, para [BS] Test Quiz. Un workflow ID no es un secreto.
-const GENERAR_QUIZ_WORKFLOW_ID = 'jmockTStWGiF0gQj';
-const RESPONDER_QUIZ_WORKFLOW_ID = 'RNzvcjm5jpUfzd6G';
+const idsFile = arg('ids');
+const IDS = JSON.parse(fs.readFileSync(idsFile, 'utf8'));
+for (const k of ['generar', 'responder']) {
+  if (!IDS[k]) throw new Error(`--ids (${idsFile}): falta la clave "${k}"`);
+}
+const GENERAR_QUIZ_WORKFLOW_ID = IDS.generar;
+const RESPONDER_QUIZ_WORKFLOW_ID = IDS.responder;
 
 const pg = { postgres: { id: arg('postgres'), name: 'BS Postgres' } };
 const telegram = { telegramApi: { id: arg('telegram'), name: 'Bootstrap_bot' } };

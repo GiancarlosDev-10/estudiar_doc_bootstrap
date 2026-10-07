@@ -40,8 +40,8 @@ fs.writeFileSync(idsEstudio, JSON.stringify({ leccion: 'L1', progreso: 'P1', dia
 
 const run = (file, args) => execFileSync(process.execPath, [path.join(root, 'scripts', file), ...args], { cwd: root });
 
-run('build-pregunta.js', ['--postgres', 'pg1', '--gemini', 'g1', '--telegram', 't1', '--openai', 'o1', '--testSecret', 's1', '--out-dir', path.relative(root, outDir)]);
-run('build-quiz.js', ['--postgres', 'pg1', '--telegram', 't1', '--openai', 'o1', '--testSecret', 's1', '--gemini', 'g1', '--out-dir', path.relative(root, outDir)]);
+run('build-pregunta.js', ['--postgres', 'pg1', '--gemini', 'g1', '--telegram', 't1', '--openai', 'o1', '--testSecret', 's1', '--ids', idsFull, '--out-dir', path.relative(root, outDir)]);
+run('build-quiz.js', ['--postgres', 'pg1', '--telegram', 't1', '--openai', 'o1', '--testSecret', 's1', '--gemini', 'g1', '--ids', idsFull, '--out-dir', path.relative(root, outDir)]);
 run('build-estudio.js', ['--postgres', 'pg1', '--telegram', 't1', '--openai', 'o1', '--testSecret', 's1', '--ids', idsEstudio, '--out-dir', path.relative(root, outDir)]);
 run('build-router.js', ['--telegram', 't1', '--webhookSecret', 'w1', '--allowed', '123', '--ids', idsFull, '--out-dir', path.relative(root, outDir)]);
 run('build-setup.js', ['--postgres', 'pg1', '--out-dir', path.relative(root, outDir)]);

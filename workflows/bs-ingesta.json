@@ -1,0 +1,434 @@
+{
+  "name": "[BS] Ingesta",
+  "nodes": [
+    {
+      "id": "i1",
+      "name": "Ejecutar ingesta",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "i2",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Versión de Bootstrap a indexar. Para actualizar: cambiar el tag y volver\n// a ejecutar; solo se re-embeben los fragmentos cuyo texto cambió.\nreturn [{ json: { tag: 'v5.3.8', repo: 'twbs/bootstrap' } }];"
+      }
+    },
+    {
+      "id": "i3",
+      "name": "Árbol del repo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.repo }}/git/trees/{{ $json.tag }}?recursive=1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "bs-study-bot"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "Una sola llamada a la API de GitHub (el límite sin token es 60/h). Los archivos se bajan de raw.githubusercontent.com, que no cuenta para ese límite."
+    },
+    {
+      "id": "i4",
+      "name": "Filtrar archivos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Filtro copiado de scripts/chunker.js (isWantedFile) por build-ingesta.js.\nconst DOCS_DIR = 'site/src/content/docs/';\n\nfunction isWantedFile(p) {\n  return (p.startsWith(DOCS_DIR) && p.endsWith('.mdx')) ||\n    p.startsWith('site/src/content/callouts/') ||\n    p === 'site/src/components/shortcodes/JsDataAttributes.mdx' ||\n    /^site\\/data\\/(sidebar|theme-colors|breakpoints)\\.yml$/.test(p) ||\n    p === 'config.yml' || p === '.browserslistrc' ||\n    ((p.startsWith('scss/') || p.startsWith('site/src/scss/')) && p.endsWith('.scss')) ||\n    (p.startsWith('js/src/') && p.endsWith('.js')) ||\n    p === 'site/src/assets/partials/snippets.js' ||\n    p.startsWith('site/static/docs/[version]/assets/js/');\n}\n\nconst { tag, repo } = $('Config').first().json;\nif ($json.truncated) throw new Error('GitHub devolvió el árbol truncado');\nreturn $json.tree\n  .filter((e) => e.type === 'blob' && isWantedFile(e.path))\n  .map((e) => ({ json: {\n    path: e.path,\n    url: `https://raw.githubusercontent.com/${repo}/${tag}/${e.path.split('/').map(encodeURIComponent).join('/')}`,\n  } }));"
+      }
+    },
+    {
+      "id": "i5",
+      "name": "Descargar archivos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 20,
+              "batchInterval": 250
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "i6",
+      "name": "Chunker",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// =============================================================================\n// chunker.js — Convierte la documentación MDX de Bootstrap 5.3 (Astro) en\n// fragmentos listos para embeber, y arma la ruta de estudio.\n//\n// Sin dependencias: el mismo código se prueba en local (scripts/test-chunker.js)\n// y se copia tal cual al nodo Code de \"[BS] Ingesta\" en n8n, donde no se\n// pueden importar paquetes. El repo es la fuente de verdad.\n//\n// Entrada: files = { 'ruta/relativa/al/repo': 'contenido', ... } con\n//   - site/src/content/docs/**/*.mdx         (las páginas)\n//   - site/src/content/callouts/*.md         (<Callout name=\"...\"/>)\n//   - site/src/components/shortcodes/JsDataAttributes.mdx\n//   - site/data/{sidebar,theme-colors,breakpoints}.yml, config.yml\n//   - scss/*.scss, js/src/**, site/src/assets/partials/snippets.js,\n//     site/src/scss/*.scss, site/static/docs/[version]/assets/js/*.js,\n//     .browserslistrc (código citado)\n// Salida: { chunks: [...], studyPath: [...], warnings: [...] }\n// =============================================================================\n\nconst DOCS_DIR = 'site/src/content/docs/';\nconst BASE_URL = 'https://getbootstrap.com/docs/5.3/';\n\n// Tamaño de fragmento. ~4 caracteres por token en inglés técnico:\n// 4000 caracteres ≈ 1000 tokens. Suficiente para una sección completa con su\n// ejemplo, y lo bastante pequeño para que el embedding no \"diluya\" el tema.\nconst MAX_CHARS = 4000;\n// Solapamiento al partir una sección larga (~15 %): la idea que queda en el\n// borde aparece en los dos fragmentos y no se pierde en la búsqueda.\nconst OVERLAP_CHARS = 600;\n// Secciones más cortas que esto se fusionan con la siguiente de la misma ##:\n// un fragmento de una línea embebe mal y casi nunca se recupera.\nconst MIN_CHARS = 200;\n\n// Partes de la ruta de estudio, EN ESTE ORDEN (las páginas de cada sección sí\n// siguen el orden del sidebar). Customize va al final (decisión de la Fase 5):\n// Sass, variables CSS y color modes personalizan componentes y utilidades, así\n// que se entienden mejor después de conocerlos; el sidebar oficial los pone\n// segundos. Lo que queda fuera de la ruta se indexa igual para el RAG y se\n// puede pedir con \"/quiz <tema>\".\nconst STUDY_SECTIONS = ['getting-started', 'layout', 'content', 'forms', 'components', 'helpers', 'utilities', 'customize'];\n// Fuera de la ruta: guías de instalación con herramientas de build y páginas\n// informativas (descarga, contenido del paquete, navegadores): no hay nada que\n// practicar en un quiz.\nconst STUDY_EXCLUDE = new Set([\n  'getting-started/webpack', 'getting-started/parcel', 'getting-started/vite', 'getting-started/contribute',\n  'getting-started/download', 'getting-started/contents', 'getting-started/browsers-devices',\n]);\n// Páginas que no se indexan: docsref es una página interna de pruebas del sitio.\nconst SKIP_PAGES = new Set(['docsref']);\n\n// Archivos del repo que necesita el chunker (páginas + lo que citan).\n// Lo usan tanto la prueba local como el workflow de n8n para descargar.\nfunction isWantedFile(p) {\n  return (p.startsWith(DOCS_DIR) && p.endsWith('.mdx')) ||\n    p.startsWith('site/src/content/callouts/') ||\n    p === 'site/src/components/shortcodes/JsDataAttributes.mdx' ||\n    /^site\\/data\\/(sidebar|theme-colors|breakpoints)\\.yml$/.test(p) ||\n    p === 'config.yml' || p === '.browserslistrc' ||\n    ((p.startsWith('scss/') || p.startsWith('site/src/scss/')) && p.endsWith('.scss')) ||\n    (p.startsWith('js/src/') && p.endsWith('.js')) ||\n    p === 'site/src/assets/partials/snippets.js' ||\n    p.startsWith('site/static/docs/[version]/assets/js/');\n}\n\n// ---------------------------------------------------------------------------\n// Slug de encabezados: réplica de github-slugger (lo que usa Astro para los\n// id de los <h2>/<h3>). Así la URL #ancla coincide con la del sitio oficial.\n// Versión simplificada: minúsculas, quita puntuación/símbolos, espacios → '-'.\n// ---------------------------------------------------------------------------\nfunction githubSlug(text) {\n  return text\n    .toLowerCase()\n    .replace(/[^\\p{L}\\p{M}\\p{N}\\p{Pc}\\- ]/gu, '')\n    .replace(/ /g, '-');\n}\n\nfunction makeSlugger() {\n  const seen = {};\n  return (text) => {\n    let slug = githubSlug(text);\n    const base = slug;\n    while (Object.prototype.hasOwnProperty.call(seen, slug)) {\n      seen[base]++;\n      slug = `${base}-${seen[base]}`;\n    }\n    seen[slug] = 0;\n    return slug;\n  };\n}\n\n// Slug de títulos del sidebar (getSlug del sitio: github-slugger + '--' → '-').\nfunction sidebarSlug(title) {\n  return githubSlug(title).replace(/--+/g, '-');\n}\n\n// ---------------------------------------------------------------------------\n// YAML mínimo: solo los formatos que usan config.yml y site/data/*.yml.\n// ---------------------------------------------------------------------------\nfunction unquote(v) {\n  v = v.trim();\n  if ((v.startsWith('\"') && v.endsWith('\"')) || (v.startsWith(\"'\") && v.endsWith(\"'\"))) return v.slice(1, -1);\n  return v;\n}\n\n// config.yml: mapas de hasta 2 niveles → { 'docs_version': '5.3', 'cdn.css': '...' }\nfunction parseConfig(src) {\n  const out = {};\n  let parent = null;\n  for (const line of src.split('\\n')) {\n    if (!line.trim() || line.trim().startsWith('#')) continue;\n    const m = line.match(/^( *)([\\w-]+):\\s*(.*)$/);\n    if (!m) continue;\n    const [, indent, key, value] = m;\n    if (indent.length === 0) {\n      if (value === '') parent = key;\n      else { parent = null; out[key] = unquote(value); }\n    } else if (parent) {\n      out[`${parent}.${key}`] = unquote(value);\n    }\n  }\n  return out;\n}\n\n// Lista de mapas planos (theme-colors.yml, breakpoints.yml).\nfunction parseYamlList(src) {\n  const items = [];\n  let cur = null;\n  for (const line of src.split('\\n')) {\n    if (!line.trim() || line.trim().startsWith('#')) continue;\n    const m = line.match(/^(-\\s+|\\s+)([\\w-]+):\\s*(.*)$/);\n    if (!m) continue;\n    if (m[1].startsWith('-')) { cur = {}; items.push(cur); }\n    if (cur) cur[m[2]] = unquote(m[3]);\n  }\n  return items;\n}\n\n// sidebar.yml: grupos (- title:) con páginas (    - title:).\nfunction parseSidebar(src) {\n  const groups = [];\n  for (const line of src.split('\\n')) {\n    const g = line.match(/^- title:\\s*(.+)$/);\n    if (g) { groups.push({ title: unquote(g[1]), pages: [] }); continue; }\n    const p = line.match(/^\\s+- title:\\s*(.+)$/);\n    if (p && groups.length) groups[groups.length - 1].pages.push(unquote(p[1]));\n  }\n  return groups;\n}\n\n// ---------------------------------------------------------------------------\n// Escáner de JSX: encuentra el final de una expresión {…} respetando\n// strings y template literals (con ${…} anidados), y parsea etiquetas.\n// ---------------------------------------------------------------------------\nfunction matchBrace(src, i) {\n  // src[i] === '{'. Devuelve el índice del '}' que la cierra.\n  let depth = 0;\n  for (let j = i; j < src.length; j++) {\n    const c = src[j];\n    if (c === '{') depth++;\n    else if (c === '}') { depth--; if (depth === 0) return j; }\n    else if (c === '\"' || c === \"'\") j = skipQuoted(src, j, c);\n    else if (c === '`') j = skipTemplate(src, j);\n  }\n  return -1;\n}\n\nfunction skipQuoted(src, i, q) {\n  for (let j = i + 1; j < src.length; j++) {\n    if (src[j] === '\\\\') { j++; continue; }\n    if (src[j] === q || src[j] === '\\n') return j;\n  }\n  return src.length;\n}\n\nfunction skipTemplate(src, i) {\n  for (let j = i + 1; j < src.length; j++) {\n    if (src[j] === '\\\\') { j++; continue; }\n    if (src[j] === '`') return j;\n    if (src[j] === '$' && src[j + 1] === '{') { j = matchBrace(src, j + 1); if (j < 0) return src.length; }\n  }\n  return src.length;\n}\n\n// Parsea <Tag attr=\"x\" attr={expr} …> o …/> desde src[start] === '<'.\nfunction parseTag(src, start) {\n  const nameMatch = src.slice(start).match(/^<([A-Za-z][\\w.]*)/);\n  if (!nameMatch) return null;\n  const name = nameMatch[1];\n  const attrs = {};\n  let j = start + nameMatch[0].length;\n  while (j < src.length) {\n    while (/\\s/.test(src[j])) j++;\n    if (src.startsWith('/>', j)) return { name, attrs, end: j + 2, selfClosing: true };\n    if (src[j] === '>') return { name, attrs, end: j + 1, selfClosing: false };\n    const a = src.slice(j).match(/^([\\w-]+)/);\n    if (!a) return null;\n    const key = a[1];\n    j += key.length;\n    if (src[j] !== '=') { attrs[key] = true; continue; }\n    j++;\n    if (src[j] === '\"' || src[j] === \"'\") {\n      const close = src.indexOf(src[j], j + 1);\n      attrs[key] = src.slice(j + 1, close);\n      j = close + 1;\n    } else if (src[j] === '{') {\n      const close = matchBrace(src, j);\n      attrs[key] = { expr: src.slice(j + 1, close) };\n      j = close + 1;\n    } else return null;\n  }\n  return null;\n}\n\n// ---------------------------------------------------------------------------\n// Utilidades de texto\n// ---------------------------------------------------------------------------\nfunction dedent(text) {\n  const lines = text.replace(/^\\n+|\\s+$/g, '').split('\\n');\n  const indents = lines.filter((l) => l.trim()).map((l) => l.match(/^ */)[0].length);\n  const min = indents.length ? Math.min(...indents) : 0;\n  return lines.map((l) => l.slice(min)).join('\\n');\n}\n\nfunction fence(code, lang) {\n  return `\\n\\`\\`\\`${lang}\\n${dedent(code)}\\n\\`\\`\\`\\n`;\n}\n\n// Extrae lo que hay entre \"// <kind>-docs-start name\" y \"// <kind>-docs-end name\".\nfunction extractDocsBlock(fileContent, kind, name) {\n  if (!fileContent) return null;\n  const re = new RegExp(`// ${kind}-docs-start ${name}\\\\n([\\\\s\\\\S]*?)// ${kind}-docs-end ${name}`);\n  const m = fileContent.match(re);\n  return m ? m[1] : null;\n}\n\n// ---------------------------------------------------------------------------\n// MDX → Markdown plano\n// ---------------------------------------------------------------------------\nfunction makeContext(files) {\n  const config = parseConfig(files['config.yml'] || '');\n  const data = {\n    'theme-colors': parseYamlList(files['site/data/theme-colors.yml'] || '')\n      .map((c) => ({ ...c, title: c.name.charAt(0).toUpperCase() + c.name.slice(1) })),\n    breakpoints: parseYamlList(files['site/data/breakpoints.yml'] || ''),\n  };\n  return {\n    files,\n    config,\n    getData: (name) => data[name] || [],\n    getConfig: () => config,\n    getSequence: (start, end, step = 1) => { const s = []; for (let i = start; i <= end; i += step) s.push(i); return s; },\n  };\n}\n\n// Evalúa la expresión JS de un code={…} (template literals, getData(...).map).\n// Solo se ejecuta código del repo oficial de Bootstrap, nunca texto de usuarios.\nfunction evalCodeExpr(expr, ctx, warnings, where) {\n  try {\n    const fn = new Function('getData', 'getConfig', 'getSequence', `\"use strict\"; return (${expr});`);\n    const v = fn(ctx.getData, ctx.getConfig, ctx.getSequence);\n    return Array.isArray(v) ? v.join('\\n') : String(v);\n  } catch (e) {\n    warnings.push(`${where}: no se pudo evaluar code={…} (${e.message}); se usa el texto literal`);\n    return expr;\n  }\n}\n\n// <Placeholder …/> dentro de un ejemplo → <img>/<svg> sencillo con su clase.\nfunction replacePlaceholders(code) {\n  return code.replace(/<Placeholder\\b[^>]*\\/>/g, (tag) => {\n    const cls = (tag.match(/class=\"([^\"]*)\"/) || [])[1];\n    const text = (tag.match(/text=\"([^\"]*)\"/) || [])[1];\n    return `<img src=\"...\"${cls ? ` class=\"${cls}\"` : ''} alt=\"${text || 'Placeholder'}\">`;\n  });\n}\n\nfunction renderComponent(tag, inner, ctx, warnings, where) {\n  const a = tag.attrs;\n  const val = (x) => (x && typeof x === 'object' ? evalCodeExpr(x.expr, ctx, warnings, where) : x);\n  switch (tag.name) {\n    case 'Example': {\n      if (a.showMarkup && a.showMarkup.expr === 'false') return '';\n      return fence(replacePlaceholders(val(a.code) || ''), a.lang || 'html');\n    }\n    case 'Code': {\n      if (a.code) return fence(val(a.code), a.lang || 'html');\n      let path = typeof a.filePath === 'object'\n        ? (a.filePath.expr.match(/'([^']+)'/) || [])[1] : a.filePath;\n      if (!path) return '';\n      // En el repo la carpeta se llama literalmente \"[version]\".\n      path = path.replace(/^\\//, 'site/');\n      const content = ctx.files[path];\n      if (!content) { warnings.push(`${where}: <Code filePath=\"${path}\"> no disponible, se omite`); return ''; }\n      return fence(content, a.lang || '');\n    }\n    case 'ScssDocs': {\n      const block = extractDocsBlock(ctx.files[a.file], 'scss', a.name);\n      if (block == null) { warnings.push(`${where}: ScssDocs ${a.name} en ${a.file} no encontrado`); return ''; }\n      return fence(block.replaceAll(' !default', ''), 'scss');\n    }\n    case 'JsDocs': {\n      const block = extractDocsBlock(ctx.files[a.file], 'js', a.name);\n      if (block == null) { warnings.push(`${where}: JsDocs ${a.name} en ${a.file} no encontrado`); return ''; }\n      return fence(block, 'js');\n    }\n    case 'Callout': {\n      const body = a.name ? ctx.files[`site/src/content/callouts/${a.name}.md`] : inner;\n      if (body == null) { warnings.push(`${where}: callout ${a.name} no encontrado`); return ''; }\n      const label = { warning: 'Warning', danger: 'Danger' }[a.type] || 'Note';\n      return `\\n> **${label}:** ${body.trim().replace(/\\n/g, '\\n> ')}\\n`;\n    }\n    case 'CalloutDeprecatedDarkVariants':\n      return `\\n> **Warning:** Dark variants for components were deprecated in v5.3.0 with the introduction of color modes. Instead of adding \\`.${a.component}-dark\\`, set \\`data-bs-theme=\"dark\"\\` on the root element, a parent wrapper, or the component itself.\\n`;\n    case 'JsDismiss':\n      return `\\nDismissal can be achieved with the \\`data-bs-dismiss\\` attribute on a button within the ${a.name}:\\n`\n        + fence(`<button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"${a.name}\" aria-label=\"Close\"></button>`, 'html')\n        + `\\nor on a button outside the ${a.name} using the additional \\`data-bs-target\\`:\\n`\n        + fence(`<button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"${a.name}\" data-bs-target=\"#my-${a.name}\" aria-label=\"Close\"></button>`, 'html');\n    case 'JsDataAttributes':\n      return `\\n${(ctx.files['site/src/components/shortcodes/JsDataAttributes.mdx'] || '').trim()}\\n`;\n    case 'Table':\n      return fence(`<table class=\"${a.class || 'table'}\">\\n  ...\\n</table>`, 'html');\n    case 'AddedIn':\n      return ` (Added in v${a.version})`;\n    case 'DeprecatedIn':\n      return ` (Deprecated in v${a.version})`;\n    case 'Placeholder':\n    case 'GuideFooter':\n      return '';\n    default:\n      // BsTable, Fragment, TableContent y cualquier otro envoltorio: se deja el contenido.\n      return inner || '';\n  }\n}\n\n// Recorre el MDX, sustituye componentes (<Mayúscula…>) y quita bloques {…}\n// de JSX sueltos (listas generadas con getData en el sitio).\nfunction transformComponents(src, ctx, warnings, where) {\n  let out = '';\n  let i = 0;\n  let inFence = false;\n  while (i < src.length) {\n    // Respetar bloques de código markdown: dentro no se transforma nada.\n    if ((i === 0 || src[i - 1] === '\\n') && src.startsWith('```', i)) {\n      inFence = !inFence;\n      const eol = src.indexOf('\\n', i);\n      out += src.slice(i, eol < 0 ? src.length : eol + 1);\n      i = eol < 0 ? src.length : eol + 1;\n      continue;\n    }\n    if (!inFence && src[i] === '<' && /[A-Z]/.test(src[i + 1] || '')) {\n      const tag = parseTag(src, i);\n      if (tag) {\n        let inner = '';\n        let end = tag.end;\n        if (!tag.selfClosing) {\n          const close = src.indexOf(`</${tag.name}>`, tag.end);\n          if (close >= 0) {\n            inner = transformComponents(src.slice(tag.end, close), ctx, warnings, where);\n            end = close + tag.name.length + 3;\n          }\n        }\n        out += renderComponent(tag, inner, ctx, warnings, where);\n        i = end;\n        continue;\n      }\n    }\n    // Bloque JSX suelto al inicio de línea: {getData('…').map(…)} → fuera.\n    if (!inFence && src[i] === '{' && (i === 0 || /\\n\\s*$/.test(src.slice(Math.max(0, i - 40), i)))) {\n      const close = matchBrace(src, i);\n      if (close > 0) { i = close + 1; continue; }\n    }\n    out += src[i];\n    i++;\n  }\n  return out;\n}\n\nfunction mdxToMarkdown(raw, ctx, warnings, where) {\n  let body = raw;\n  const fm = {};\n  const m = body.match(/^---\\n([\\s\\S]*?)\\n---\\n/);\n  if (m) {\n    for (const line of m[1].split('\\n')) {\n      const kv = line.match(/^(\\w+):\\s*(.*)$/);\n      if (kv) fm[kv[1]] = unquote(kv[2]);\n    }\n    body = body.slice(m[0].length);\n  }\n  body = body\n    .replace(/^(import|export) .*$/gm, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '');\n  body = transformComponents(body, ctx, warnings, where);\n  body = body\n    .replace(/\\[\\[config:([\\w.]+)\\]\\]/g, (_, k) => ctx.config[k] ?? '')\n    .replace(/\\[\\[docsref:\\/?([^\\]]*)\\]\\]/g, (_, p) => BASE_URL + p)\n    // Enlaces internos relativos → absolutos, para que el LLM cite URLs válidas.\n    .replace(/\\]\\(\\/docs\\//g, '](https://getbootstrap.com/docs/')\n    .replace(/\\n{3,}/g, '\\n\\n');\n  return { fm, body: body.trim() };\n}\n\n// ---------------------------------------------------------------------------\n// Markdown → secciones por ## / ### → fragmentos\n// ---------------------------------------------------------------------------\n// Texto visible de un encabezado markdown (lo que el sitio usa para el id).\n// Dentro de `código` se conserva todo (p. ej. el _ de `_maps.scss`); fuera,\n// se quitan los marcadores de énfasis * y _.\nfunction headingText(md) {\n  return md\n    .replace(/\\[([^\\]]*)\\]\\([^)]*\\)/g, '$1')\n    .replace(/<[^>]+>/g, '')\n    .split(/(`[^`]*`)/)\n    .map((part) => (part.startsWith('`') ? part.slice(1, -1) : part.replace(/[*_]/g, '')))\n    .join('')\n    .trim();\n}\n\nfunction splitSections(body, pageTitle, pageUrl) {\n  const slug = makeSlugger();\n  const sections = [];\n  let cur = { h2: null, h3: null, anchor: '', lines: [] };\n  let inFence = false;\n  for (const line of body.split('\\n')) {\n    if (line.startsWith('```')) inFence = !inFence;\n    const h = !inFence && line.match(/^(#{2,6})\\s+(.+?)\\s*#*$/);\n    if (h) {\n      const text = headingText(h[2]);\n      const id = slug(text); // todos los niveles consumen slug, como en el sitio\n      if (h[1].length <= 3) {\n        sections.push(cur);\n        cur = h[1].length === 2\n          ? { h2: text, h3: null, anchor: id, lines: [] }\n          : { h2: cur.h2, h3: text, anchor: id, lines: [] };\n        continue;\n      }\n    }\n    cur.lines.push(line);\n  }\n  sections.push(cur);\n  return sections\n    .map((s) => ({\n      headingPath: [pageTitle, s.h2, s.h3].filter(Boolean),\n      url: s.anchor ? `${pageUrl}#${s.anchor}` : pageUrl,\n      text: s.lines.join('\\n').trim(),\n    }))\n    .filter((s) => s.text.length > 0);\n}\n\n// Parte un texto largo por bloques (párrafos / bloques de código enteros),\n// con solapamiento del último bloque entre partes consecutivas.\nfunction splitLong(text) {\n  if (text.length <= MAX_CHARS) return [text];\n  const blocks = [];\n  let buf = [];\n  let inFence = false;\n  for (const line of text.split('\\n')) {\n    if (line.startsWith('```')) inFence = !inFence;\n    buf.push(line);\n    if (!inFence && line.trim() === '') { blocks.push(buf.join('\\n')); buf = []; }\n  }\n  if (buf.length) blocks.push(buf.join('\\n'));\n\n  const parts = [];\n  let cur = '';\n  for (let block of blocks) {\n    // Un bloque (p. ej. un ejemplo enorme) mayor que el tope se corta por líneas.\n    while (block.length > MAX_CHARS) {\n      const cut = block.lastIndexOf('\\n', MAX_CHARS) > 0 ? block.lastIndexOf('\\n', MAX_CHARS) : MAX_CHARS;\n      if (cur.trim()) { parts.push(cur); cur = ''; }\n      parts.push(block.slice(0, cut));\n      block = block.slice(cut);\n    }\n    if (cur.length + block.length > MAX_CHARS && cur.trim()) {\n      parts.push(cur);\n      const tail = cur.slice(-OVERLAP_CHARS);\n      const cutAt = tail.indexOf('\\n\\n');\n      cur = (cutAt >= 0 ? tail.slice(cutAt + 2) : '') + block;\n    } else {\n      cur += block;\n    }\n  }\n  if (cur.trim()) parts.push(cur);\n  return parts.map((p) => p.trim()).filter(Boolean);\n}\n\n// ---------------------------------------------------------------------------\n// Punto de entrada\n// ---------------------------------------------------------------------------\nfunction buildChunks(files, version) {\n  const ctx = makeContext(files);\n  const warnings = [];\n  const chunks = [];\n  const pageTitles = {};\n\n  const docPaths = Object.keys(files)\n    .filter((p) => p.startsWith(DOCS_DIR) && p.endsWith('.mdx'))\n    .sort();\n\n  for (const path of docPaths) {\n    const rel = path.slice(DOCS_DIR.length, -'.mdx'.length); // 'layout/grid' o 'migration'\n    if (SKIP_PAGES.has(rel)) continue;\n    const [section, page] = rel.includes('/') ? rel.split('/') : [rel, rel];\n    const pageUrl = `${BASE_URL}${rel}/`;\n    const { fm, body } = mdxToMarkdown(files[path], ctx, warnings, rel);\n    const title = fm.title || page;\n    pageTitles[rel] = title;\n\n    // Sección de intro de la página: la description del front matter + texto previo al primer ##.\n    const sections = splitSections(`${fm.description || ''}\\n\\n${body}`, title, pageUrl);\n\n    // Fusionar secciones muy cortas con la siguiente: la intro de la página con\n    // la primera sección, y una ## corta con sus ###. El fragmento resultante\n    // conserva la URL de la primera parte y lleva el encabezado de la segunda.\n    const merged = [];\n    for (const s of sections) {\n      const prev = merged[merged.length - 1];\n      const isIntro = prev && prev.headingPath.length === 1;\n      if (prev && prev.text.length < MIN_CHARS && (isIntro || prev.headingPath[1] === s.headingPath[1])) {\n        const level = '#'.repeat(s.headingPath.length);\n        prev.text = `${prev.text}\\n\\n${level} ${s.headingPath[s.headingPath.length - 1]}\\n\\n${s.text}`;\n      } else merged.push({ ...s });\n    }\n\n    let order = 0;\n    for (const s of merged) {\n      for (const part of splitLong(s.text)) {\n        chunks.push({\n          section,\n          page,\n          heading_path: s.headingPath,\n          url: s.url,\n          order_index: order++,\n          // El contexto va dentro del texto: un fragmento que dice solo\n          // \"Use .col for equal width\" se recupera mal si no sabe de qué página es.\n          content: `${s.headingPath.join(' > ')}\\n\\n${part}`,\n          has_code: part.includes('```'),\n          source_path: path,\n          version,\n        });\n      }\n    }\n  }\n\n  // Ruta de estudio: secciones en el orden de STUDY_SECTIONS, páginas en el\n  // orden del sidebar oficial.\n  const studyPath = [];\n  let order = 0;\n  const groups = parseSidebar(files['site/data/sidebar.yml'] || '')\n    .filter((g) => STUDY_SECTIONS.includes(sidebarSlug(g.title)))\n    .sort((a, b) => STUDY_SECTIONS.indexOf(sidebarSlug(a.title)) - STUDY_SECTIONS.indexOf(sidebarSlug(b.title)));\n  for (const group of groups) {\n    const section = sidebarSlug(group.title);\n    for (const pageTitle of group.pages) {\n      const page = sidebarSlug(pageTitle);\n      const key = `${section}/${page}`;\n      if (STUDY_EXCLUDE.has(key)) continue;\n      if (!pageTitles[key]) { warnings.push(`sidebar: ${key} no tiene archivo .mdx`); continue; }\n      studyPath.push({ topic_key: key, order_index: order++, section, page, title: pageTitles[key], url: `${BASE_URL}${key}/` });\n    }\n  }\n\n  return { chunks, studyPath, warnings };\n}\n\nif (typeof module !== 'undefined') module.exports = { buildChunks, githubSlug, isWantedFile };\n\n\n// ===== n8n: armar el mapa de archivos y ejecutar el chunker =====\nconst meta = $('Filtrar archivos').all();\nconst files = {};\n$input.all().forEach((item, i) => {\n  files[meta[i].json.path] = String(item.json.data ?? '').replace(/\\r\\n/g, '\\n');\n});\nconst { tag } = $('Config').first().json;\nconst { chunks, studyPath, warnings } = buildChunks(files, tag);\n\n// Antes había aquí una comprobación de que el contenido no incluyera el\n// delimitador \"$bsjson$\": ya no hace falta, porque los fragmentos viajan como\n// bind parameters reales (sql/ingesta/01_sync.sql, scripts/sql-node.js) y no\n// dentro de un literal de dollar quoting que ese texto pudiera cerrar.\n\nconst bySection = {};\nfor (const c of chunks) bySection[c.section] = (bySection[c.section] || 0) + 1;\nreturn [{ json: {\n  tag, files: Object.keys(files).length, chunkCount: chunks.length,\n  studyPathCount: studyPath.length, bySection, warnings, chunks, studyPath,\n} }];"
+      },
+      "notes": "Copia de scripts/chunker.js + envoltorio. Regenerar con scripts/build-ingesta.js, no editar a mano."
+    },
+    {
+      "id": "i7",
+      "name": "Sincronizar y detectar cambios",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1320,
+        -100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- ingesta/01_sync.sql — [BS] Ingesta, nodo \"Sincronizar y detectar cambios\"\n--\n-- Recibe TODOS los fragmentos y la ruta de estudio que produce el chunker y:\n--   1. Actualiza study_path (upsert; conserva los temas con progreso).\n--   2. Borra los fragmentos que ya no existen en la documentación.\n--   3. Actualiza metadatos (url, versión…) de los fragmentos cuyo texto no cambió.\n--   4. Devuelve SOLO los fragmentos nuevos o con texto distinto: son los únicos\n--      que necesitan embedding. Reindexar sale gratis si nada cambió.\n--\n-- $1 y $2 son bind parameters reales (ver scripts/sql-node.js): el valor\n-- viaja por options.queryReplacement y Postgres lo trata siempre como un\n-- dato, nunca como texto SQL. Antes el JSON se metía entre $bsjson$ (dollar\n-- quoting) con una expresión de n8n; como JSON.stringify no escapa \"$\", un\n-- contenido que incluyera la etiqueta \"$bsjson$\" cerraba el literal ahí mismo\n-- y el resto se ejecutaba como SQL (inyección).\n-- =============================================================================\n\nBEGIN;\n\nCREATE TEMP TABLE _sp ON COMMIT DROP AS\nSELECT *\n  FROM jsonb_to_recordset($1::jsonb)\n       AS x(topic_key text, order_index int, section text, page text, title text, url text);\n\n-- order_index es UNIQUE: si el sidebar se reordena, dos temas podrían chocar a\n-- mitad del upsert. Se mueven antes a negativos; los que ya no están en la\n-- ruta se quedan en negativo (fuera de la ruta, pero con su progreso intacto).\nUPDATE study_path SET order_index = -1000 - order_index WHERE order_index >= 0;\n\nINSERT INTO study_path (topic_key, order_index, section, page, title, url)\nSELECT topic_key, order_index, section, page, title, url FROM _sp\nON CONFLICT (topic_key) DO UPDATE\n   SET order_index = EXCLUDED.order_index,\n       section     = EXCLUDED.section,\n       page        = EXCLUDED.page,\n       title       = EXCLUDED.title,\n       url         = EXCLUDED.url;\n\nCREATE TEMP TABLE _in ON COMMIT DROP AS\nSELECT x.*,\n       encode(sha256(convert_to(x.content, 'UTF8')), 'hex') AS content_hash\n  FROM jsonb_to_recordset($2::jsonb)\n       AS x(section text, page text, heading_path text[], url text, order_index int,\n            content text, has_code boolean, source_path text, version text);\n\nDELETE FROM doc_chunks d\n WHERE NOT EXISTS (SELECT 1 FROM _in i\n                    WHERE i.source_path = d.source_path AND i.order_index = d.order_index);\n\nUPDATE doc_chunks d\n   SET url          = i.url,\n       heading_path = i.heading_path,\n       has_code     = i.has_code,\n       version      = i.version,\n       metadata     = d.metadata || jsonb_build_object('url', i.url, 'heading_path', i.heading_path, 'version', i.version),\n       updated_at   = now()\n  FROM _in i\n WHERE i.source_path = d.source_path\n   AND i.order_index = d.order_index\n   AND i.content_hash = d.content_hash\n   AND (d.url <> i.url OR d.version <> i.version OR d.heading_path <> i.heading_path OR d.has_code <> i.has_code);\n\n-- Resultado del nodo: fragmentos a embeber (nuevos, con texto cambiado o sin vector).\nSELECT i.*\n  FROM _in i\n  LEFT JOIN doc_chunks d\n    ON d.source_path = i.source_path AND d.order_index = i.order_index\n WHERE d.id IS NULL\n    OR d.content_hash <> i.content_hash\n    OR d.embedding IS NULL\n ORDER BY i.source_path, i.order_index;\n\nCOMMIT;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.studyPath), JSON.stringify($json.chunks) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Copia de sql/ingesta/01_sync.sql. Devuelve solo los fragmentos nuevos o cambiados."
+    },
+    {
+      "id": "i8",
+      "name": "Preparar lotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// Agrupa los fragmentos a embeber en lotes de 90 (una petición por lote).\nconst BATCH = 90;\nconst items = $input.all().map((i) => i.json).filter((c) => c.content);\nconst out = [];\nfor (let i = 0; i < items.length; i += BATCH) {\n  const chunks = items.slice(i, i + BATCH);\n  out.push({ json: {\n    chunks,\n    body: { requests: chunks.map((c) => ({\n      model: 'models/gemini-embedding-2',\n      // Embedding asimétrico: documentos \"title: … | text: …\";\n      // las consultas (Fase 3) usarán \"task: search result | query: …\".\n      content: { parts: [{ text: `title: ${c.heading_path.join(' > ')} | text: ${c.content.slice(c.content.indexOf('\\n\\n') + 2)}` }] },\n      outputDimensionality: 1536,\n    })) },\n  } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "i13",
+      "name": "Lote actual",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1760,
+        -100
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "notes": "Loop: un lote por vuelta. Cada lote se guarda antes de pedir el siguiente, así un fallo a mitad no pierde lo ya embebido (al reejecutar, solo se embebe lo que falta)."
+    },
+    {
+      "id": "i9",
+      "name": "Embeddings Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1980,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:batchEmbedContents",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_GEMINI",
+          "name": "BS Gemini"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "Un lote (≤ 90 textos) por vuelta del loop. El ritmo lo marca el nodo \"Esperar cuota\"."
+    },
+    {
+      "id": "i10",
+      "name": "Unir embeddings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -200
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Empareja cada vector con su fragmento (del lote actual) y valida la respuesta.\nconst { chunks } = $('Lote actual').item.json;\nconst embs = $json.embeddings || [];\nif (embs.length !== chunks.length) throw new Error(`${embs.length} embeddings para ${chunks.length} fragmentos`);\nconst rows = chunks.map((c, k) => {\n  const v = embs[k].values;\n  if (!v || v.length !== 1536) throw new Error(`Dimensión ${v && v.length} ≠ 1536`);\n  return { ...c, embedding: `[${v.join(',')}]` };\n});\nreturn { json: { rows, count: rows.length, tokens: $json.usageMetadata?.promptTokenCount ?? null } };"
+      }
+    },
+    {
+      "id": "i11",
+      "name": "Guardar fragmentos",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2420,
+        -200
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- ingesta/02_upsert.sql — [BS] Ingesta, nodo \"Guardar fragmentos\"\n--\n-- Se ejecuta una vez por lote (≤ 100 fragmentos ya con embedding).\n-- metadata duplica las columnas útiles: es lo que devuelve el nodo\n-- \"Postgres PGVector Store\" junto a cada fragmento recuperado (Fase 3).\n-- =============================================================================\n\nINSERT INTO doc_chunks\n  (content, embedding, metadata, section, page, heading_path, url,\n   order_index, has_code, source_path, content_hash, version)\nSELECT x.content,\n       x.embedding::vector,\n       jsonb_build_object(\n         'topic_key',    x.section || '/' || x.page,\n         'section',      x.section,\n         'page',         x.page,\n         'heading_path', x.heading_path,\n         'url',          x.url,\n         'has_code',     x.has_code,\n         'version',      x.version\n       ),\n       x.section, x.page, x.heading_path, x.url,\n       x.order_index, x.has_code, x.source_path, x.content_hash, x.version\n  FROM jsonb_to_recordset($1::jsonb)\n       AS x(content text, embedding text, section text, page text, heading_path text[],\n            url text, order_index int, has_code boolean, source_path text,\n            content_hash text, version text)\nON CONFLICT (source_path, order_index) DO UPDATE\n   SET content      = EXCLUDED.content,\n       embedding    = EXCLUDED.embedding,\n       metadata     = EXCLUDED.metadata,\n       section      = EXCLUDED.section,\n       page         = EXCLUDED.page,\n       heading_path = EXCLUDED.heading_path,\n       url          = EXCLUDED.url,\n       has_code     = EXCLUDED.has_code,\n       content_hash = EXCLUDED.content_hash,\n       version      = EXCLUDED.version,\n       updated_at   = now();\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.rows) ] }}",
+          "queryBatching": "independently"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "notes": "Copia de sql/ingesta/02_upsert.sql. Una consulta por lote."
+    },
+    {
+      "id": "i14",
+      "name": "Esperar cuota",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        -200
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 62,
+        "unit": "seconds"
+      },
+      "notes": "Deja pasar el minuto de cuota del free tier antes del siguiente lote."
+    },
+    {
+      "id": "i12",
+      "name": "Resumen",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1320,
+        140
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- ingesta/03_resumen.sql — [BS] Ingesta, nodo \"Resumen\"\n-- Conteo por sección (criterio de \"terminado\" de la Fase 2) + total.\n-- =============================================================================\n\nSELECT section                                  AS seccion,\n       count(*)                                 AS fragmentos,\n       count(*) FILTER (WHERE embedding IS NOT NULL) AS con_embedding,\n       count(*) FILTER (WHERE has_code)         AS con_codigo,\n       max(version)                             AS version\n  FROM doc_chunks\n GROUP BY section\nUNION ALL\nSELECT '— TOTAL —', count(*), count(*) FILTER (WHERE embedding IS NOT NULL),\n       count(*) FILTER (WHERE has_code),\n       (SELECT count(*)::text || ' temas en la ruta' FROM study_path WHERE order_index >= 0)\n  FROM doc_chunks\n ORDER BY fragmentos DESC;\n",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Rama de abajo: con executionOrder v1 se ejecuta después de terminar la de arriba, así el conteo ya incluye lo guardado (y también corre cuando no hubo cambios)."
+    }
+  ],
+  "connections": {
+    "Ejecutar ingesta": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Árbol del repo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Árbol del repo": {
+      "main": [
+        [
+          {
+            "node": "Filtrar archivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar archivos": {
+      "main": [
+        [
+          {
+            "node": "Descargar archivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar archivos": {
+      "main": [
+        [
+          {
+            "node": "Chunker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunker": {
+      "main": [
+        [
+          {
+            "node": "Sincronizar y detectar cambios",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sincronizar y detectar cambios": {
+      "main": [
+        [
+          {
+            "node": "Preparar lotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar lotes": {
+      "main": [
+        [
+          {
+            "node": "Lote actual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lote actual": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Embeddings Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Gemini": {
+      "main": [
+        [
+          {
+            "node": "Unir embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir embeddings": {
+      "main": [
+        [
+          {
+            "node": "Guardar fragmentos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar fragmentos": {
+      "main": [
+        [
+          {
+            "node": "Esperar cuota",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar cuota": {
+      "main": [
+        [
+          {
+            "node": "Lote actual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

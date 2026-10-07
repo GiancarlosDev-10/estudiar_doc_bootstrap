@@ -1,0 +1,957 @@
+{
+  "name": "[BS] Pregunta libre (RAG)",
+  "nodes": [
+    {
+      "id": "r1",
+      "name": "Entrada",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "Recibe { chat_id, text } del router, o además { dry_run: true, source: \"eval\" } de [BS] Test RAG."
+    },
+    {
+      "id": "r2",
+      "name": "Preparar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Normaliza la entrada. Si la pregunta queda vacía (\"/pregunta\" solo), arma\n// aquí mismo la respuesta de ayuda y el IF siguiente la manda a \"Resultado\".\nlet question = String($json.text ?? '').trim().replace(/^\\/pregunta(@\\w+)?\\b/i, '').trim().slice(0, 500);\nconst base = {\n  chat_id: Number($json.chat_id),\n  dry_run: $json.dry_run === true,\n  source: $json.source === 'eval' ? 'eval' : 'telegram',\n  // Solo en el eval: forzar un modelo ({ provider, model }) para comparar\n  // modelos con los mismos fragmentos y el mismo prompt (Fase 6).\n  force_model: $json.source === 'eval' && $json.force_model?.model ? $json.force_model : null,\n  // Solo en el eval: llamar al LLM aunque la similitud quede bajo el UMBRAL,\n  // para medir si el modelo mismo sabe decir \"no está en la documentación\"\n  // (en producción esas preguntas se cortan antes y todos los modelos empatan).\n  ignore_umbral: $json.source === 'eval' && $json.ignore_umbral === true,\n  question,\n  started_at: Date.now(),\n};\nif (!question) {\n  return { json: { ...base, outcome: 'help', empty: true, parts: [\n    'Escribe tu duda sobre Bootstrap 5.3, por ejemplo:\\n<code>¿Cómo centro un div horizontalmente?</code>\\n\\nTambién sirve <code>/pregunta &lt;tu duda&gt;</code>.',\n  ] } };\n}\nreturn { json: { ...base, empty: false } };"
+      }
+    },
+    {
+      "id": "r3",
+      "name": "¿Vacía?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r3-c",
+              "leftValue": "={{ $json.empty }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "r4",
+      "name": "Historial",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        660,
+        -120
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- rag/01_historial.sql — [BS] Pregunta libre (RAG), nodo \"Historial\"\n--\n-- Devuelve SIEMPRE una fila: has_history y el historial ya formateado para el\n-- prompt de reescritura (hasta 3 preguntas respondidas en los últimos 30 min,\n-- las más viejas primero). Al agregar aquí, el workflow no necesita un nodo\n-- Code para agrupar filas, y el IF siguiente recibe exactamente un item.\n--\n-- Solo las preguntas de Telegram tienen memoria: en el eval (source 'eval',\n-- chat_id 0) cada pregunta debe ser independiente, o las anteriores se\n-- colarían como historial y contaminarían la calibración del umbral.\n-- Las respuestas se recortan a 600 caracteres: para resolver \"¿y en móvil?\"\n-- basta el tema, y así la reescritura sale barata.\n--\n-- $1 es un bind parameter real (scripts/sql-node.js): viaja por\n-- options.queryReplacement, nunca concatenado en el texto del SQL.\n-- =============================================================================\n\nSELECT count(*) > 0 AS has_history,\n       coalesce(string_agg('Usuario: ' || r.question || E'\\nBot: ' || left(coalesce(r.answer, ''), 600),\n                           E'\\n\\n' ORDER BY r.created_at), '') AS history_text\n  FROM (\n    SELECT q.question, q.answer, q.created_at\n      FROM rag_queries q,\n           jsonb_to_record($1::jsonb) AS p(chat_id bigint, source text)\n     WHERE p.source = 'telegram'\n       AND q.source = 'telegram'\n       AND q.chat_id = p.chat_id\n       AND q.outcome = 'answered'\n       AND q.created_at >= now() - interval '30 minutes'\n     ORDER BY q.created_at DESC\n     LIMIT 3\n  ) r;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $json.chat_id, source: $json.source }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Siempre 1 fila: has_history + history_text (sql/rag/01_historial.sql). El eval nunca tiene historial."
+    },
+    {
+      "id": "r5",
+      "name": "¿Hay historial?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r5-c",
+              "leftValue": "={{ $json.has_history }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "r6",
+      "name": "Reescribir consulta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        -240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'gpt-4o-mini',\n  messages: [{ role: 'system', content: \"Tu única tarea es decidir si el \\\"Mensaje nuevo\\\" depende del historial y, solo en ese caso,\\nreescribirlo como una pregunta autónoma para buscarla en la documentación de Bootstrap 5.3.\\n\\nReglas:\\n- Si el mensaje se entiende solo (nombra su propio tema), o no tiene relación con el historial,\\n  responde exactamente: IGUAL\\n  No le agregues palabras, versiones ni contexto: aunque te parezca que lo mejora, responde IGUAL.\\n- Solo si depende del historial (\\\"¿y en móvil?\\\", \\\"¿y eso cómo se hace?\\\", \\\"¿y si quiero que se\\n  colapse en tablet?\\\", pronombres sin antecedente), reescríbelo resolviendo la referencia con el\\n  tema de la última pregunta. Ejemplo: historial sobre el navbar + \\\"¿y en móvil?\\\" →\\n  \\\"¿Cómo se comporta el navbar en móvil?\\\"\\n- No respondas la pregunta ni agregues explicaciones ni comillas.\\n- Devuelve solo IGUAL o la pregunta reescrita, en una línea.\" },\n    { role: 'user', content: 'Historial:\\n' + $json.history_text + '\\n\\nMensaje nuevo:\\n' + $('Preparar').first().json.question }],\n  max_completion_tokens: 200\n}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REEMPLAZAR_OPENAI",
+          "name": "OpenAI account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "notes": "Solo con historial: vuelve autónomo un seguimiento (\"¿y en móvil?\"). Si falla, se busca con la pregunta original."
+    },
+    {
+      "id": "r7",
+      "name": "Consulta de búsqueda",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n\n// Punto de encuentro de las dos ramas: con reescritura, $json es la respuesta\n// de Gemini; sin ella, es la fila de \"Historial\". En ambos casos la base sale\n// de \"Preparar\", que siempre corre.\nconst base = $('Preparar').first().json;\n// Sin reescritura, o si respondió IGUAL, se busca con la pregunta original.\nreturn { json: { ...base, search_query: rewriteResult(llmText($json), base.question) } };"
+      }
+    },
+    {
+      "id": "r8",
+      "name": "Embeber consulta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        -120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: { parts: [{ text: 'task: search result | query: ' + $json.search_query }] }, outputDimensionality: 1536 }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_GEMINI",
+          "name": "BS Gemini"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "Embedding asimétrico: consultas con \"task: search result | query: …\"; los documentos se embebieron con \"title: … | text: …\" (Fase 2)."
+    },
+    {
+      "id": "r9",
+      "name": "Buscar fragmentos",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1760,
+        -120
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- rag/02_buscar.sql — [BS] Pregunta libre (RAG), nodo \"Buscar fragmentos\"\n--\n-- Devuelve SIEMPRE una fila: chunks (JSON con los TOPK fragmentos más cercanos,\n-- de mayor a menor similitud) y top_similarity (0 si no hubo ninguno).\n--\n-- similarity = 1 - distancia coseno: 1 es idéntico y 0 es ortogonal.\n--\n-- El parámetro q es el arreglo \"values\" tal como lo devuelve Gemini. El texto\n-- de un arreglo JSON (\"[0.1, -0.2, …]\") ya es un literal válido de pgvector,\n-- así que no hace falta un nodo Code que lo convierta. Si la dimensión no fuera\n-- 1536, el operador <=> falla con \"different vector dimensions\": el error\n-- queda a la vista, no se degrada en silencio.\n--\n-- El vector va en una subconsulta escalar, (SELECT v FROM p), para que el\n-- planificador lo trate como un valor fijo y pueda usar el índice HNSW.\n-- =============================================================================\n\nWITH p AS (\n  SELECT (x.q::text)::vector AS v\n    FROM jsonb_to_record($1::jsonb) AS x(q jsonb)\n),\ntop AS (\n  SELECT c.id, c.content, c.url, c.heading_path, c.topic_key,\n         1 - (c.embedding <=> (SELECT v FROM p)) AS similarity\n    FROM doc_chunks c\n   WHERE c.embedding IS NOT NULL\n   ORDER BY c.embedding <=> (SELECT v FROM p)\n   LIMIT 6\n)\nSELECT coalesce(json_agg(top ORDER BY top.similarity DESC), '[]'::json) AS chunks,\n       coalesce(max(top.similarity), 0)                                  AS top_similarity\n  FROM top;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ q: $json.embedding.values }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Siempre 1 fila: chunks (top 6, JSON) + top_similarity (sql/rag/02_buscar.sql)."
+    },
+    {
+      "id": "r10",
+      "name": "Armar prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n\n// Corre una vez, o de nuevo si hay que repetir la llamada al LLM:\n//  - desde \"¿Reintentar?\": la respuesta traía sintaxis v4 ($json.v4_hits);\n//  - desde \"¿Probar respaldo?\": el modelo actual falló y toca el siguiente de\n//    la cadena ($json.use_fallback, $json.next_idx).\n// En ambos casos $json trae attempt, model_idx y los tokens gastados hasta ahora.\nconst MODELS = [{\"provider\":\"openai\",\"model\":\"gpt-4o-mini\"},{\"provider\":\"gemini\",\"model\":\"gemini-3.7-flash\"},{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash\"}];\nconst UMBRAL = 0.68;\nconst base = $('Consulta de búsqueda').first().json;\nconst { chunks, top_similarity } = $('Buscar fragmentos').first().json;\nconst retry = $json.attempt ? $json : null;\n// Con force_model (solo eval) la cadena es ese único modelo.\nconst chain = base.force_model ? [base.force_model] : MODELS;\nconst common = { ...base, top_similarity, chunk_ids: chunks.map((c) => c.id), similarities: chunks.map((c) => c.similarity) };\n\nif (!retry && top_similarity < UMBRAL && !base.ignore_umbral) {\n  // Nada suficientemente parecido: se responde sin llamar al LLM.\n  return { json: { ...common, done: true, outcome: 'no_context',\n    parts: ['No está en la documentación de Bootstrap 5.3. Si es sobre Bootstrap, prueba a reformularla con el nombre del componente o la utilidad.'],\n    latency_ms: Date.now() - base.started_at } };\n}\n\nlet prompt_text = buildContext(chunks, base.question, base.search_query);\nif (retry?.v4_hits?.length) {\n  prompt_text += `\\n\\nCorrección obligatoria: tu respuesta anterior tenía sintaxis de Bootstrap 4 dentro de un bloque de código (${retry.v4_hits.join(', ')}). Reescríbela completa: en los bloques de código solo va sintaxis válida de 5.3.`;\n}\nreturn { json: { ...common, done: false, chunks, prompt_text,\n  ...(() => { const i = retry?.use_fallback ? retry.next_idx : (retry?.model_idx ?? 0);\n    return { model_idx: i, model: chain[i].model, provider: chain[i].provider, chain_len: chain.length }; })(),\n  attempt: (retry?.attempt ?? 0) + 1, v4_retried: retry?.v4_retried ?? false,\n  fallback_from: retry?.fallback_from ?? null, fallback_error: retry?.fallback_error ?? null,\n  prompt_tokens: retry?.prompt_tokens ?? 0, completion_tokens: retry?.completion_tokens ?? 0 } };"
+      }
+    },
+    {
+      "id": "r11",
+      "name": "¿Sin contexto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2200,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r11-c",
+              "leftValue": "={{ $json.done }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "UMBRAL = 0.68: calibrado con eval/fase3-umbral.json (ver build-pregunta.js)."
+    },
+    {
+      "id": "r12",
+      "name": "Generar respuesta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2420,
+        -240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + $json.model + ':generateContent' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  systemInstruction: { parts: [{ text: \"Eres el asistente de estudio de **Bootstrap 5.3** de un bot de Telegram. Respondes en\\n**español**, pero mantienes en **inglés** los nombres de clases, componentes, atributos\\n`data-bs-*` y variables Sass (escribe \\\"usa la clase `d-flex`\\\", no la traduzcas).\\n\\nReglas, en orden de prioridad:\\n\\n1. Responde **solo** con los fragmentos numerados del mensaje del usuario. No uses conocimiento\\n   general de Bootstrap ni de otras versiones. Si los fragmentos no alcanzan para responder\\n   todo, dilo con claridad (\\\"Con la documentación que encontré no puedo responder …\\\") y explica\\n   qué parte sí cubren.\\n2. **Nunca inventes** una clase, atributo, variable o valor que no aparezca en los fragmentos.\\n3. Bootstrap 5.3 no usa jQuery ni la sintaxis de Bootstrap 4. Si la pregunta usa sintaxis de v4\\n   (`ml-*`, `mr-*`, `pl-*`, `pr-*`, `data-toggle`, `data-target`, `data-dismiss`, `float-left`,\\n   `float-right`, `badge-pill`, `form-group`, `custom-select`, `jumbotron`, `media`), acláralo\\n   explícitamente y da el equivalente de 5.3 (p. ej. `ml-3` → `ms-3` por el soporte RTL;\\n   `data-toggle` → `data-bs-toggle`). La sintaxis de v4 solo puede aparecer en el texto, como\\n   código en línea; **nunca dentro de un bloque de código**, ni siquiera como contraejemplo.\\n   Los bloques de código muestran solo sintaxis válida de 5.3.\\n4. Cita cada afirmación con el número del fragmento del que sale, entre corchetes y pegado a la\\n   frase: \\\"el grid usa 12 columnas [1]\\\". Si combinas fragmentos, cita todos los que uses, un\\n   número por corchete: \\\"[2][3]\\\", no \\\"[2, 3]\\\". No\\n   escribas una lista de fuentes ni URLs: las agrega el sistema a partir de tus citas.\\n5. Formato para Telegram: Markdown simple. Nombres de clases y atributos como `código en línea`,\\n   `**negrita**` solo para resaltar una idea, listas con `-` y ejemplos en bloques con\\n   ```html (o el lenguaje que corresponda). Sin encabezados (`#`) ni tablas. Sé conciso: 2-4\\n   párrafos o una lista corta, más un ejemplo si ayuda.\\n6. Si el **tema central** de la pregunta no aparece en los fragmentos (otro framework como\\n   Tailwind o React, otro lenguaje, temas generales, o una integración que la documentación no\\n   trata), responde exactamente \\\"Esto no está en la documentación de Bootstrap 5.3.\\\" y nada\\n   más: sin citas, sin fragmentos \\\"parecidos\\\" y sin alternativas. La regla 1 (respuesta\\n   parcial) es solo para cuando los fragmentos cubren parte del tema que se pregunta.\" }] },\n  contents: [{ role: 'user', parts: [{ text: $json.prompt_text }] }],\n  generationConfig: { temperature: 0.2, maxOutputTokens: 1500, thinkingConfig: {\"thinkingBudget\":0} }\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_GEMINI",
+          "name": "BS Gemini"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "Modelo Gemini = $json.model (lo elige \"Armar prompt\" de la cadena). systemInstruction = prompts/rag.md; turno de usuario = fragmentos + pregunta (rag-lib.buildContext)."
+    },
+    {
+      "id": "r12b",
+      "name": "Generar respuesta OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2420,
+        -420
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: $json.model,\n  messages: [{ role: 'system', content: \"Eres el asistente de estudio de **Bootstrap 5.3** de un bot de Telegram. Respondes en\\n**español**, pero mantienes en **inglés** los nombres de clases, componentes, atributos\\n`data-bs-*` y variables Sass (escribe \\\"usa la clase `d-flex`\\\", no la traduzcas).\\n\\nReglas, en orden de prioridad:\\n\\n1. Responde **solo** con los fragmentos numerados del mensaje del usuario. No uses conocimiento\\n   general de Bootstrap ni de otras versiones. Si los fragmentos no alcanzan para responder\\n   todo, dilo con claridad (\\\"Con la documentación que encontré no puedo responder …\\\") y explica\\n   qué parte sí cubren.\\n2. **Nunca inventes** una clase, atributo, variable o valor que no aparezca en los fragmentos.\\n3. Bootstrap 5.3 no usa jQuery ni la sintaxis de Bootstrap 4. Si la pregunta usa sintaxis de v4\\n   (`ml-*`, `mr-*`, `pl-*`, `pr-*`, `data-toggle`, `data-target`, `data-dismiss`, `float-left`,\\n   `float-right`, `badge-pill`, `form-group`, `custom-select`, `jumbotron`, `media`), acláralo\\n   explícitamente y da el equivalente de 5.3 (p. ej. `ml-3` → `ms-3` por el soporte RTL;\\n   `data-toggle` → `data-bs-toggle`). La sintaxis de v4 solo puede aparecer en el texto, como\\n   código en línea; **nunca dentro de un bloque de código**, ni siquiera como contraejemplo.\\n   Los bloques de código muestran solo sintaxis válida de 5.3.\\n4. Cita cada afirmación con el número del fragmento del que sale, entre corchetes y pegado a la\\n   frase: \\\"el grid usa 12 columnas [1]\\\". Si combinas fragmentos, cita todos los que uses, un\\n   número por corchete: \\\"[2][3]\\\", no \\\"[2, 3]\\\". No\\n   escribas una lista de fuentes ni URLs: las agrega el sistema a partir de tus citas.\\n5. Formato para Telegram: Markdown simple. Nombres de clases y atributos como `código en línea`,\\n   `**negrita**` solo para resaltar una idea, listas con `-` y ejemplos en bloques con\\n   ```html (o el lenguaje que corresponda). Sin encabezados (`#`) ni tablas. Sé conciso: 2-4\\n   párrafos o una lista corta, más un ejemplo si ayuda.\\n6. Si el **tema central** de la pregunta no aparece en los fragmentos (otro framework como\\n   Tailwind o React, otro lenguaje, temas generales, o una integración que la documentación no\\n   trata), responde exactamente \\\"Esto no está en la documentación de Bootstrap 5.3.\\\" y nada\\n   más: sin citas, sin fragmentos \\\"parecidos\\\" y sin alternativas. La regla 1 (respuesta\\n   parcial) es solo para cuando los fragmentos cubren parte del tema que se pregunta.\" }, { role: 'user', content: $json.prompt_text }],\n  max_completion_tokens: 1500\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REEMPLAZAR_OPENAI",
+          "name": "OpenAI account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput",
+      "notes": "Último eslabón de la cadena (de pago): solo corre si los dos Gemini fallaron. Mismo system prompt y mismos fragmentos."
+    },
+    {
+      "id": "r13",
+      "name": "Procesar respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n\n// $('Armar prompt').item sigue el item de ESTA vuelta (paired items), así que\n// es correcto también en el reintento.\nconst p = $('Armar prompt').item.json;\nconst text = llmText($json);\nif (!text) {\n  // Respuesta vacía (bloqueo de seguridad, corte por tokens…): se trata como\n  // error; la salida de error de este nodo va a \"Error LLM\".\n  throw new Error(`${p.model} devolvió una respuesta vacía (finish reason: ${llmFinishReason($json)})`);\n}\nconst t = llmTokens($json);\nconst { chunks, prompt_text, done, ...rest } = p;\nif (isNotInDocs(text)) {\n  // El LLM decidió que el tema no está (regla 6): se registra como no_context\n  // y se envía solo la frase fija, sin citas ni fuentes aunque las haya puesto.\n  return { json: { ...rest, outcome: 'no_context', answer_md: text, parts: [escapeHtml(NOT_IN_DOCS)],\n    cited_urls: [], v4_hits: [], v4_retry: !!p.v4_retried, retry: false, model: p.model,\n    prompt_tokens: p.prompt_tokens + t.prompt, completion_tokens: p.completion_tokens + t.completion,\n    latency_ms: Date.now() - p.started_at } };\n}\nconst v4_hits = findV4Syntax(text);\nconst { parts, citedUrls } = formatAnswer(text, p.chunks);\nreturn { json: { ...rest, outcome: 'answered', answer_md: text, parts, cited_urls: citedUrls,\n  // attempt < 3: como mucho una llamada extra por v4, aunque antes haya habido\n  // otra por respaldo. v4_retry marca solo los reintentos por sintaxis.\n  v4_hits, v4_retry: !!p.v4_retried, retry: v4_hits.length > 0 && !p.v4_retried && p.attempt < 3,\n  v4_retried: !!p.v4_retried || v4_hits.length > 0,\n  model: p.model,\n  prompt_tokens: p.prompt_tokens + t.prompt, completion_tokens: p.completion_tokens + t.completion,\n  latency_ms: Date.now() - p.started_at } };"
+      },
+      "onError": "continueErrorOutput",
+      "notes": "Valida (texto vacío = error), detecta sintaxis v4 en bloques de código y deja la respuesta ya formateada para Telegram."
+    },
+    {
+      "id": "r14",
+      "name": "¿Reintentar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2860,
+        -300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r14-c",
+              "leftValue": "={{ $json.retry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Un solo reintento: si la segunda versión también trae v4, se envía igual y queda marcada con v4_retry en rag_queries."
+    },
+    {
+      "id": "r15",
+      "name": "Error LLM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        -60
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Llega desde la salida de error de \"Generar respuesta\" (saturación, cuota,\n// modelo retirado) o de \"Procesar respuesta\" (respuesta vacía).\n// Si queda otro modelo en la cadena, pide repetir con él (IF siguiente); si\n// falló el último, arma la respuesta de error final.\nconst p = $('Armar prompt').item.json;\n// description trae el mensaje real de la API; message es el genérico de n8n.\nconst error = String($json.error?.description || $json.error?.message || $json.error || 'desconocido').slice(0, 500);\nif (p.model_idx < p.chain_len - 1) {\n  const { chunks, prompt_text, done, ...state } = p;\n  // fallback_from/fallback_error acumulan la historia, para el registro.\n  return { json: { ...state, use_fallback: true, next_idx: p.model_idx + 1,\n    fallback_from: [p.fallback_from, p.model].filter(Boolean).join(' → '),\n    fallback_error: [p.fallback_error, `${p.model}: ${error.slice(0, 150)}`].filter(Boolean).join(' | ') } };\n}\nreturn { json: { ...p, chunks: undefined, prompt_text: undefined, done: undefined,\n  use_fallback: false, outcome: 'error', error,\n  parts: ['No pude generar la respuesta ahora: los modelos no respondieron. Intenta de nuevo en un minuto.'],\n  latency_ms: Date.now() - p.started_at } };"
+      }
+    },
+    {
+      "id": "r15b",
+      "name": "¿Probar respaldo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3080,
+        -60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r15b-c",
+              "leftValue": "={{ $json.use_fallback }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Cadena: gpt-4o-mini → gemini-3.7-flash → gemini-3.5-flash. Cada modelo se intenta una vez."
+    },
+    {
+      "id": "r11b",
+      "name": "¿OpenAI?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2310,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r11b-c",
+              "leftValue": "={{ $json.provider }}",
+              "rightValue": "openai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Gemini y OpenAI tienen APIs distintas (URL, credencial, formato): un nodo HTTP por proveedor."
+    },
+    {
+      "id": "r16",
+      "name": "Resultado",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3080,
+        0
+      ],
+      "parameters": {},
+      "notes": "Punto único de convergencia: ayuda, sin contexto, respondida o error, todas con la misma forma (outcome, parts, …)."
+    },
+    {
+      "id": "r17",
+      "name": "Registrar",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3300,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- rag/03_registrar.sql — [BS] Pregunta libre (RAG), nodo \"Registrar\"\n--\n-- Un INSERT por pregunta. Registra answered, no_context y error: así se mide\n-- cuántas preguntas quedan fuera de la documentación y cuántas fallan. La\n-- ayuda por un /pregunta vacío (outcome 'help') no se registra, porque no es\n-- una pregunta: el filtro WHERE la descarta y el INSERT no hace nada.\n--\n-- Esta misma tabla es la memoria corta del chat (rag/01_historial.sql).\n-- =============================================================================\n\nINSERT INTO rag_queries\n  (chat_id, source, question, search_query, outcome, answer,\n   chunk_ids, similarities, top_similarity, cited_urls, v4_retry,\n   model, prompt_tokens, completion_tokens, latency_ms)\nSELECT x.chat_id, x.source, x.question, x.search_query, x.outcome, x.answer,\n       x.chunk_ids, x.similarities, x.top_similarity, x.cited_urls, x.v4_retry,\n       x.model, x.prompt_tokens, x.completion_tokens, x.latency_ms\n  FROM jsonb_to_record($1::jsonb)\n       AS x(chat_id bigint, source text, question text, search_query text,\n            outcome text, answer text, chunk_ids uuid[], similarities real[],\n            top_similarity real, cited_urls text[], v4_retry boolean,\n            model text, prompt_tokens int, completion_tokens int, latency_ms int)\n WHERE x.outcome IN ('answered', 'no_context', 'error')\nRETURNING id;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $json.chat_id, source: $json.source, question: $json.question,\n  search_query: $json.search_query ?? $json.question, outcome: $json.outcome, answer: $json.answer_md ?? null,\n  chunk_ids: $json.chunk_ids ?? [], similarities: $json.similarities ?? [], top_similarity: $json.top_similarity ?? null,\n  cited_urls: $json.cited_urls ?? [], v4_retry: $json.v4_retry === true, model: $json.model ?? null,\n  prompt_tokens: $json.prompt_tokens ?? null, completion_tokens: $json.completion_tokens ?? null, latency_ms: $json.latency_ms ?? null }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "notes": "INSERT en rag_queries (no registra la ayuda). Si el registro falla, la respuesta se envía igual: el log no debe dejar al usuario sin respuesta."
+    },
+    {
+      "id": "r18",
+      "name": "¿dry_run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3520,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "r18-c",
+              "leftValue": "={{ $('Resultado').first().json.dry_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "r19",
+      "name": "Salida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Lo que recibe quien llamó en modo prueba ([BS] Test RAG): sin el texto de\n// los fragmentos, que es grande y no hace falta para evaluar.\nconst r = $('Resultado').first().json;\nreturn [{ json: {\n  outcome: r.outcome, question: r.question, search_query: r.search_query ?? null,\n  top_similarity: r.top_similarity ?? null, similarities: r.similarities ?? [],\n  answer_md: r.answer_md ?? null, parts: r.parts, cited_urls: r.cited_urls ?? [],\n  // URLs de los fragmentos recuperados, en orden: para ver si el que hacía\n  // falta estaba en el top 6 (problema de recuperación) o no (del LLM).\n  chunk_urls: ($('Buscar fragmentos').isExecuted ? $('Buscar fragmentos').first().json.chunks : []).map((c) => c.url),\n  v4_hits: r.v4_hits ?? [], v4_retry: r.v4_retry ?? false, error: r.error ?? null,\n  model: r.model ?? null, fallback_from: r.fallback_from ?? null, fallback_error: r.fallback_error ?? null,\n  prompt_tokens: r.prompt_tokens ?? null, completion_tokens: r.completion_tokens ?? null, latency_ms: r.latency_ms ?? null,\n} }];"
+      }
+    },
+    {
+      "id": "r20",
+      "name": "Repartir partes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3740,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n\n// Un item por mensaje (≤ 4096 caracteres cada uno). plain es el respaldo por\n// si Telegram rechaza el HTML.\nconst r = $('Resultado').first().json;\nreturn r.parts.map((html) => ({ json: { chat_id: r.chat_id, html, plain: htmlToPlain(html) } }));"
+      }
+    },
+    {
+      "id": "r21",
+      "name": "Enviar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3960,
+        120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.html }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "Si Telegram rechaza el HTML, ese mensaje sale por la salida de error hacia \"Enviar plano\"."
+    },
+    {
+      "id": "r22",
+      "name": "Enviar plano",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4180,
+        240
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Repartir partes').item.json.chat_id }}",
+        "text": "={{ $('Repartir partes').item.json.plain }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Entrada": {
+      "main": [
+        [
+          {
+            "node": "Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar": {
+      "main": [
+        [
+          {
+            "node": "¿Vacía?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Vacía?": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Historial": {
+      "main": [
+        [
+          {
+            "node": "¿Hay historial?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay historial?": {
+      "main": [
+        [
+          {
+            "node": "Reescribir consulta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consulta de búsqueda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reescribir consulta": {
+      "main": [
+        [
+          {
+            "node": "Consulta de búsqueda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consulta de búsqueda": {
+      "main": [
+        [
+          {
+            "node": "Embeber consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeber consulta": {
+      "main": [
+        [
+          {
+            "node": "Buscar fragmentos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar fragmentos": {
+      "main": [
+        [
+          {
+            "node": "Armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar prompt": {
+      "main": [
+        [
+          {
+            "node": "¿Sin contexto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Sin contexto?": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿OpenAI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿OpenAI?": {
+      "main": [
+        [
+          {
+            "node": "Generar respuesta OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Procesar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar respuesta OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Procesar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar respuesta": {
+      "main": [
+        [
+          {
+            "node": "¿Reintentar?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Reintentar?": {
+      "main": [
+        [
+          {
+            "node": "Armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error LLM": {
+      "main": [
+        [
+          {
+            "node": "¿Probar respaldo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Probar respaldo?": {
+      "main": [
+        [
+          {
+            "node": "Armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resultado": {
+      "main": [
+        [
+          {
+            "node": "Registrar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar": {
+      "main": [
+        [
+          {
+            "node": "¿dry_run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿dry_run?": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Repartir partes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Repartir partes": {
+      "main": [
+        [
+          {
+            "node": "Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Enviar plano",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

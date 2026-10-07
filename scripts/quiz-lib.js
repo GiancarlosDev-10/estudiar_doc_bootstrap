@@ -314,10 +314,10 @@ function answerToast(r) {
 // Prefijo simétrico "task: sentence similarity": aquí se comparan preguntas
 // con preguntas, no una consulta con un documento (eso es el asimétrico del RAG).
 // -----------------------------------------------------------------------------
-// Umbral calibrado el 2026-10-05 con 70 pares reales (eval/fase5-dedup.json):
-// con la variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el
-// límite (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que
-// separe: un duplicado quedaba en 0,913 y un par distinto en 0,931.
+// Umbral calibrado con 70 pares reales (eval/fase5-dedup.json): con la
+// variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el límite
+// (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que separe:
+// un duplicado quedaba en 0,913 y un par distinto en 0,931.
 // Un falso positivo cuesta un reintento; un falso negativo, una pregunta repetida.
 const DEDUP_THRESHOLD = 0.935;
 // Contra cuántas preguntas recientes del mismo tema se compara.

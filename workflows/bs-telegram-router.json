@@ -1,0 +1,617 @@
+{
+  "name": "[BS] Telegram Router",
+  "nodes": [
+    {
+      "id": "r1",
+      "name": "Telegram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bs-telegram",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_WEBHOOK_SECRET",
+          "name": "BS Telegram Webhook Secret"
+        }
+      },
+      "notes": "Webhook normal en vez de Telegram Trigger: la URL se registra a mano con setWebhook (no depende de WEBHOOK_URL del servidor). Header Auth valida el secret_token que Telegram envía en cada update; sin él, 403."
+    },
+    {
+      "id": "r2",
+      "name": "Normalizar y whitelist",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Whitelist de chat_id: el bot ignora a cualquiera que no esté aquí.\nconst ALLOWED = [\"TU_CHAT_ID\"]; // TODO: reemplaza por tu chat_id numérico real (pídeselo a @userinfobot)\n\nconst u = $json.body ?? {};\nconst cq = u.callback_query;\nconst chat = u.message?.chat ?? cq?.message?.chat;\nconst chatId = chat ? String(chat.id) : '';\n\n// Solo chats privados de la whitelist; lo demás termina aquí sin responder.\nif (!chat || chat.type !== 'private' || !ALLOWED.includes(chatId)) return [];\n\nreturn [{ json: {\n  update_id: u.update_id,\n  type: cq ? 'callback_query' : (u.message ? 'message' : 'other'),\n  chat_id: chatId,\n  text: u.message?.text ?? null,\n  callback_data: cq?.data ?? null,\n  callback_query_id: cq?.id ?? null,\n  message_id: (u.message ?? cq?.message)?.message_id ?? null,\n}}];"
+      }
+    },
+    {
+      "id": "r3",
+      "name": "Clasificar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const t = ($json.text || '').trim();\nconst cb = $json.callback_data || '';\nlet kind;\nif ($json.type === 'callback_query') {\n  // q:<uuid>:<índice> = respuesta a un quiz\n  // n:quiz = \"Otra pregunta\"; h:n:<test_id> = \"Siguiente pregunta\" del test\n  // n:hoy = \"Siguiente lección\"; h:t:<orden> = \"Ponerme a prueba\"; h:s:<orden> = \"Ya lo sé\"\n  if (cb.startsWith('q:')) kind = 'respuesta';\n  else if (cb === 'n:quiz' || cb.startsWith('h:n:')) kind = 'quiz';\n  else if (cb === 'n:hoy' || cb.startsWith('h:t:') || cb.startsWith('h:s:')) kind = 'hoy';\n  else kind = 'callback';\n}\nelse if (/^\\/start\\b/i.test(t)) kind = 'start';\nelse if (/^\\/quiz\\b/i.test(t)) kind = 'quiz';\nelse if (/^\\/(hoy|saltar)\\b/i.test(t)) kind = 'hoy';\nelse if (/^\\/progreso\\b/i.test(t)) kind = 'progreso';\nelse if (/^\\/hora\\b/i.test(t)) kind = 'hora';\nelse if (t && !t.startsWith('/')) kind = 'pregunta';\nelse if (/^\\/pregunta\\b/i.test(t)) kind = 'pregunta';\nelse kind = 'otro_comando';\nreturn [{ json: { ...$json, kind } }];"
+      }
+    },
+    {
+      "id": "r4",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "start"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "start"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-pregunta",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "pregunta"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "pregunta"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-otro_comando",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "otro_comando"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "otro_comando"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-callback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "callback"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "callback"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-quiz",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "quiz"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "quiz"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-respuesta",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "respuesta"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "respuesta"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-hoy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "hoy"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "hoy"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-progreso",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "progreso"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "progreso"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "c-hora",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "hora"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "hora"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      }
+    },
+    {
+      "id": "r5",
+      "name": "Bienvenida",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        -300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "¡Hola! 👋 Soy tu bot de estudio de Bootstrap 5.3.\n\n📖 <code>/hoy</code>: la lección del tema que toca en la ruta (Getting started → Layout → … → Utilities → Customize). Al final, \"Ponerme a prueba\": 3 preguntas, y con 2 aciertos pasas al siguiente tema.\n🧠 <code>/quiz</code>: una pregunta. Primero los repasos vencidos; si no hay, 70 % del tema actual y 30 % de tu tema más débil. <code>/quiz navbar</code> pregunta de un tema concreto. La dificultad se ajusta sola.\n❓ Escribe cualquier duda (o <code>/pregunta &lt;duda&gt;</code>) y te respondo citando la documentación oficial.\n📊 <code>/progreso</code>: tu avance por sección y tus 3 temas más débiles.\n⏰ <code>/hora 10 20</code>: a qué horas te escribo cada día (Lima). <code>/hora off</code> lo apaga.\n⏭️ <code>/saltar</code>: da por visto el tema actual si ya lo dominas.",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      }
+    },
+    {
+      "id": "r6",
+      "name": "Comando desconocido",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        -120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "No conozco ese comando. Prueba /hoy, /quiz, /progreso, /hora o escríbeme cualquier duda sobre Bootstrap 5.3.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      }
+    },
+    {
+      "id": "r-pregunta",
+      "name": "Ejecutar Pregunta libre",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        60
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_PREGUNTA",
+          "mode": "id",
+          "cachedResultName": "[BS] Pregunta libre (RAG)"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "r-quiz",
+      "name": "Ejecutar Generar quiz",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        240
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_GENERAR",
+          "mode": "id",
+          "cachedResultName": "[BS] Generar quiz"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "r-respuesta",
+      "name": "Ejecutar Responder quiz",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        420
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_RESPONDER",
+          "mode": "id",
+          "cachedResultName": "[BS] Responder quiz"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "r-hoy",
+      "name": "Ejecutar Lección del día",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        600
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_LECCION",
+          "mode": "id",
+          "cachedResultName": "[BS] Lección del día"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "r-progreso",
+      "name": "Ejecutar Progreso",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        780
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_PROGRESO",
+          "mode": "id",
+          "cachedResultName": "[BS] Progreso"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    },
+    {
+      "id": "r-hora",
+      "name": "Ejecutar Envío diario",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        960
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_DIARIO",
+          "mode": "id",
+          "cachedResultName": "[BS] Envío diario"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalizar y whitelist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar y whitelist": {
+      "main": [
+        [
+          {
+            "node": "Clasificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Bienvenida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar Pregunta libre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comando desconocido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Ejecutar Generar quiz",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar Responder quiz",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar Lección del día",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar Progreso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar Envío diario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

@@ -1,0 +1,269 @@
+{
+  "name": "[BS] Test Quiz",
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bs-test-quiz",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_TEST_SECRET",
+          "name": "BS Test RAG Secret"
+        }
+      },
+      "notes": "Header X-BS-Test-Secret. Genera preguntas con chat_id 0 (no es un chat real) y no envía nada a Telegram."
+    },
+    {
+      "id": "t2",
+      "name": "Preparar temas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const b = $input.first().json.body ?? {};\n// Respuestas: el callback_query_id y el message_id son falsos, así que los\n// nodos de Telegram de [BS] Responder quiz fallan (y siguen); lo que se prueba\n// es submit_answer.\nif (b.respuestas?.length) return b.respuestas.map((r) => ({ json: { tema: 'respuesta ' + r.id, accion: 'responder',\n  chat_id: 0, callback_data: 'q:' + r.id + ':' + r.indice, callback_query_id: 'test', message_id: 0 } }));\nconst temas = b.temas ?? [];\nif (!temas.length) return [{ json: { error: 'body.temas o body.respuestas vacío' } }];\n// tema \"\" = sin pista (selección automática); rand fija el 70/30; test_id = pregunta del test de la lección.\nreturn temas.map((t) => ({ json: { tema: t, accion: 'generar', chat_id: 0, dry_run: true, text: ('/quiz ' + t).trim(),\n  force_level: b.force_level ?? null, rand: b.rand ?? null, test_id: b.test_id ?? null } }));"
+      }
+    },
+    {
+      "id": "t2b",
+      "name": "¿Responder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        330,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "t2b-c",
+              "leftValue": "={{ $json.accion }}",
+              "rightValue": "responder",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "t3b",
+      "name": "Ejecutar Responder quiz",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_RESPONDER",
+          "mode": "id",
+          "cachedResultName": "[BS] Responder quiz"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "t4b",
+      "name": "Juntar respuestas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// La salida de [BS] Responder quiz es la de su último nodo; el estado real\n// de submit_answer se lee de \"Preparar mensajes\" dentro de esa ejecución.\nreturn [{ json: { results: $input.all().map((i) => i.json) } }];"
+      }
+    },
+    {
+      "id": "t3",
+      "name": "Ejecutar Generar quiz",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_GENERAR",
+          "mode": "id",
+          "cachedResultName": "[BS] Generar quiz"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "t4",
+      "name": "Juntar resultados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const temas = $('Preparar temas').all().map((i) => i.json.tema);\nreturn [{ json: { results: $input.all().map((i, k) => ({ tema: temas[k], ...i.json })) } }];"
+      }
+    },
+    {
+      "id": "t5",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Preparar temas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar temas": {
+      "main": [
+        [
+          {
+            "node": "¿Responder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Responder?": {
+      "main": [
+        [
+          {
+            "node": "Ejecutar Responder quiz",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar Generar quiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar Responder quiz": {
+      "main": [
+        [
+          {
+            "node": "Juntar respuestas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Juntar respuestas": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar Generar quiz": {
+      "main": [
+        [
+          {
+            "node": "Juntar resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Juntar resultados": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

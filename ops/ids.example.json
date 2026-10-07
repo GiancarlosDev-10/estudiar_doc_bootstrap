@@ -1,0 +1,28 @@
+{
+  "_nota": "Copia este archivo a ops/ids.local.json y rellena los valores reales (IDs de credenciales y de workflows de tu instancia de n8n). ids.local.json está en .gitignore: nunca se commitea.",
+  "credenciales": {
+    "postgres": "",
+    "gemini": "",
+    "telegram": "",
+    "openai": "",
+    "testSecret": "",
+    "webhookSecret": ""
+  },
+  "allowed": "TU_CHAT_ID",
+  "workflows": {
+    "pregunta": "",
+    "testRag": "",
+    "generar": "",
+    "responder": "",
+    "testQuiz": "",
+    "medir": "",
+    "leccion": "",
+    "progreso": "",
+    "diario": "",
+    "testEstudio": "",
+    "router": "",
+    "setup": "",
+    "ingesta": "",
+    "eval": ""
+  }
+}

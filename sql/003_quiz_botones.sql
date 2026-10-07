@@ -10,11 +10,10 @@ BEGIN;
 -- -----------------------------------------------------------------------------
 -- quiz_next_clicks: qué botones "Otra pregunta" ya se usaron.
 --
--- Por qué existe: el 2026-10-03, un doble toque rápido en "Otra pregunta"
--- llegó como dos callbacks casi simultáneos; las dos ejecuciones de
--- [BS] Generar quiz leyeron el mismo estado y mandaron dos preguntas casi
--- iguales. Las respuestas A-D ya estaban protegidas por submit_answer
--- (FOR UPDATE); este botón no tenía nada que bloquear.
+-- Por qué existe: un doble toque rápido en "Otra pregunta" puede llegar como
+-- dos callbacks casi simultáneos, y las dos ejecuciones de [BS] Generar quiz
+-- generarían dos preguntas casi iguales. Las respuestas A-D ya estaban
+-- protegidas por submit_answer (FOR UPDATE); este botón no tenía nada que bloquear.
 --
 -- El botón vive en un mensaje concreto, así que (chat_id, message_id) lo
 -- identifica. "Reclamar botón" hace INSERT … ON CONFLICT DO NOTHING: la clave

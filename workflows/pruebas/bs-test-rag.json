@@ -1,0 +1,153 @@
+{
+  "name": "[BS] Test RAG",
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bs-test-rag",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_TEST_SECRET",
+          "name": "BS Test RAG Secret"
+        }
+      },
+      "notes": "Body: { \"preguntas\": [{ \"id\": …, \"pregunta\": \"…\" }] } (mismo formato que eval/*.json). Header: X-BS-Test-Secret (credencial BS Test RAG Secret; en local, variable BS_TEST_RAG_SECRET)."
+    },
+    {
+      "id": "t2",
+      "name": "Preparar preguntas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const qs = $input.first().json.body?.preguntas ?? [];\nif (!qs.length) return [{ json: { error: 'body.preguntas vacío o ausente' } }];\n// force_model opcional en el body: { \"provider\": \"openai\", \"model\": \"gpt-4o-mini\" }.\nconst force_model = $input.first().json.body?.force_model ?? null;\nreturn qs.map((q) => ({ json: { ref_id: q.id, chat_id: 0, dry_run: true, source: 'eval', text: q.pregunta, force_model } }));"
+      }
+    },
+    {
+      "id": "t3",
+      "name": "Ejecutar RAG",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_PREGUNTA",
+          "mode": "id",
+          "cachedResultName": "[BS] Pregunta libre (RAG)"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Una ejecución por pregunta, en secuencia (respeta mejor la cuota del free tier). Si una falla, las demás siguen."
+    },
+    {
+      "id": "t4",
+      "name": "Juntar resultados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const refs = $('Preparar preguntas').all().map((i) => i.json.ref_id);\nreturn [{ json: { results: $input.all().map((i, k) => ({ id: refs[k], ...i.json })) } }];"
+      }
+    },
+    {
+      "id": "t5",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Preparar preguntas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar preguntas": {
+      "main": [
+        [
+          {
+            "node": "Ejecutar RAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar RAG": {
+      "main": [
+        [
+          {
+            "node": "Juntar resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Juntar resultados": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

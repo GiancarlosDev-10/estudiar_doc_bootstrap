@@ -25,8 +25,8 @@ exactamente qué probar en Telegram o en n8n y qué resultado esperar.
   No cambiarlo sin reindexar. Embedding asimétrico: documentos con `title: … | text: …`,
   consultas con `task: search result | query: …`. (Decidido en la Fase 2; antes era OpenAI
   `text-embedding-3-small`, se cambió por costo cero y porque la key de Gemini se usa igual en la Fase 6.)
-- **Modelo de chat**: intercambiable entre OpenAI y Gemini. Se decide en la Fase 6 con
-  una evaluación medida, no por impresión.
+- **Modelo de chat**: `gpt-4o-mini` como principal (RAG, quiz, lección), con Gemini free tier
+  de respaldo en el RAG. Decidido en la Fase 6 por costo (ver `eval/fase6-conclusion.md`).
 
 ## Herramientas que tienes
 - **n8n-mcp** (MCP): úsalo para consultar la documentación y los parámetros de cada nodo
@@ -76,9 +76,11 @@ Corrige estos errores de app-ure:
   el nivel a mano.
 
 ## Arquitectura
-- **Un solo Telegram Trigger.** Telegram permite un único webhook por bot, así que habrá
+- **Un solo webhook.** Telegram permite un único webhook por bot, así que hay
   **un workflow router** `[BS] Telegram Router` que recibe `message` y `callback_query`,
-  aplica la whitelist y deriva a sub-workflows con *Execute Workflow*.
+  aplica la whitelist y deriva a sub-workflows con *Execute Workflow*. Se usa un nodo
+  Webhook que valida `X-Telegram-Bot-Api-Secret-Token` en vez de Telegram Trigger, para no
+  tocar la configuración del servidor n8n compartido (decidido en la Fase 0).
   El webhook requiere que n8n esté expuesto por **HTTPS** (`WEBHOOK_URL`); verifícalo en la Fase 0.
 - Sub-workflows: `[BS] Ingesta`, `[BS] Pregunta libre (RAG)`, `[BS] Generar quiz`,
   `[BS] Responder quiz`, `[BS] Lección del día`, `[BS] Progreso`, `[BS] Evaluación de modelos`.
@@ -165,7 +167,9 @@ bootstrap-study-bot/
   .env.example
   sql/
   prompts/             # system prompts versionados (rag.md, quiz.md, leccion.md)
-  workflows/           # exports limpios
+  scripts/             # build-*.js generan los workflows; *-lib.js + tests
+  workflows/           # exports limpios (node scripts/export-workflows.js)
+  ops/                 # despliegue: bash ops/deploy.sh build|publicar (IDs en ops/ids.local.json, ignorado)
   eval/
   README.md
 ```

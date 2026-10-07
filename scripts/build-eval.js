@@ -4,7 +4,10 @@
 //
 // Uso:
 //   node scripts/build-eval.js --openai <credId> --gemini <credId> \
-//     --testSecret <credId> --out-dir tmp
+//     --testSecret <credId> --ids <archivo.json> --out-dir tmp
+// --ids: { pregunta } con el ID de [BS] Pregunta libre (RAG), que este
+// workflow invoca en modo evaluación. No es un secreto; el primer despliegue
+// lo crea y lo anota ahí.
 //
 // Webhook POST bs-eval-modelos (header X-BS-Test-Secret). Una pregunta por
 // llamada, así cada request dura ~1 min y un fallo no tira la corrida entera
@@ -32,7 +35,10 @@ const arg = (name) => {
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-const PREGUNTA_WORKFLOW_ID = 'ry9T1L9MSmoOsqUl';
+const idsFile = arg('ids');
+const IDS = JSON.parse(fs.readFileSync(idsFile, 'utf8'));
+if (!IDS.pregunta) throw new Error(`--ids (${idsFile}): falta la clave "pregunta"`);
+const PREGUNTA_WORKFLOW_ID = IDS.pregunta;
 const openai = { openAiApi: { id: arg('openai'), name: 'OpenAI account' } };
 const gemini = { googlePalmApi: { id: arg('gemini'), name: 'BS Gemini' } };
 const testSecret = { httpHeaderAuth: { id: arg('testSecret'), name: 'BS Test RAG Secret' } };

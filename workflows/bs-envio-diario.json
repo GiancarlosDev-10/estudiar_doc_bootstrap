@@ -1,0 +1,751 @@
+{
+  "name": "[BS] Envío diario",
+  "nodes": [
+    {
+      "id": "d1",
+      "name": "Cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "notes": "Corre cada hora en punto (zona del workflow: America/Lima). Qué chats reciben algo lo decide bot_settings.hours."
+    },
+    {
+      "id": "d2",
+      "name": "Entrada",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "Del router: /hora. De [BS] Test Estudio: { hour, chat_id: 0, dry_run } para simular un turno."
+    },
+    {
+      "id": "d3",
+      "name": "¿/hora?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d3-c",
+              "leftValue": "={{ String($json.text ?? \"\") }}",
+              "rightValue": "/hora",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d4",
+      "name": "Parámetros",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { hour: Number.isInteger($json.hour) ? $json.hour : null,\n  chat_id: $json.chat_id != null ? Number($json.chat_id) : null, dry_run: $json.dry_run === true } };"
+      },
+      "notes": "Desde el Schedule: hora real y todos los chats. Desde el arnés: una hora y un chat fijos."
+    },
+    {
+      "id": "d5",
+      "name": "Turnos de esta hora",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- diario/01_turnos.sql — [BS] Envío diario, nodo \"Turnos de esta hora\"\n--\n-- El Schedule corre cada hora en punto. Esta consulta devuelve una fila por\n-- chat al que le toca un envío AHORA (hora de America/Lima dentro de\n-- bot_settings.hours) y lo reclama en schedule_runs: la clave primaria\n-- (chat, día, hora) impide enviar dos veces el mismo turno. Sin turnos, 0 filas\n-- y el workflow termina ahí.\n--\n-- Qué se envía (acordado en la Fase 5):\n--   primera hora del día (10:00) → la lección de /hoy; si hay repasos\n--                                  vencidos, antes una pregunta de repaso.\n--   las demás (20:00)            → repaso si hay vencidos; si no, y hoy no se\n--                                  terminó un test de la lección, un\n--                                  recordatorio con \"Ponerme a prueba\"; si ya\n--                                  se hizo, una pregunta de /quiz.\n--\n-- hour y chat_id son opcionales: solo para probar desde el arnés sin esperar a\n-- la hora real.\n-- =============================================================================\n\nWITH p AS (\n  SELECT * FROM jsonb_to_record($1::jsonb) AS x(hour int, chat_id bigint)\n),\nahora AS (\n  SELECT (now() AT TIME ZONE 'America/Lima') AS t\n),\ndue AS (\n  SELECT s.chat_id,\n         a.t::date AS run_on,\n         coalesce(p.hour, extract(hour FROM a.t)::int) AS hour,\n         coalesce(p.hour, extract(hour FROM a.t)::int) = (SELECT min(h) FROM unnest(s.hours) h) AS es_primera,\n         (SELECT count(*) FROM topic_progress tp\n           WHERE tp.chat_id = s.chat_id AND tp.next_review_at <= now()) AS vencidos,\n         EXISTS (SELECT 1 FROM lesson_tests lt\n                  WHERE lt.chat_id = s.chat_id AND lt.finished_at IS NOT NULL AND NOT lt.abandoned\n                    AND (lt.created_at AT TIME ZONE 'America/Lima')::date = a.t::date) AS test_hoy,\n         sp.order_index AS topic_order, sp.title AS topic_title\n    FROM bot_settings s\n    CROSS JOIN p\n    CROSS JOIN ahora a\n    LEFT JOIN study_path sp ON sp.topic_key = current_topic(s.chat_id)\n   WHERE s.enabled\n     AND (p.chat_id IS NULL OR s.chat_id = p.chat_id)\n     -- chat_id 0 = el arnés de pruebas: el Schedule real nunca le escribe.\n     AND (s.chat_id <> 0 OR p.chat_id = 0)\n     AND coalesce(p.hour, extract(hour FROM a.t)::int) = ANY (s.hours)\n),\nacc AS (\n  SELECT d.*,\n         CASE WHEN d.es_primera THEN CASE WHEN d.vencidos > 0 THEN 'repaso+hoy' ELSE 'hoy' END\n              WHEN d.vencidos > 0 THEN 'repaso'\n              WHEN NOT d.test_hoy AND d.topic_order IS NOT NULL THEN 'recordatorio'\n              ELSE 'quiz' END AS action\n    FROM due d\n),\nins AS (\n  INSERT INTO schedule_runs (chat_id, run_on, hour, action)\n  SELECT chat_id, run_on, hour, action FROM acc\n  ON CONFLICT DO NOTHING\n  RETURNING chat_id\n)\nSELECT acc.* FROM acc JOIN ins USING (chat_id);\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ hour: $json.hour, chat_id: $json.chat_id }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Una fila por chat al que le toca un envío ahora; schedule_runs impide repetir el turno. 0 filas = nada que hacer."
+    },
+    {
+      "id": "d6",
+      "name": "Qué enviar",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "or",
+                "conditions": [
+                  {
+                    "id": "d6-a",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "repaso",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  },
+                  {
+                    "id": "d6-b",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "quiz",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "pregunta"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d6-c",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "hoy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "endsWith"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "leccion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d6-d",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "recordatorio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "recordatorio"
+            }
+          ]
+        },
+        "options": {
+          "allMatchingOutputs": true
+        }
+      }
+    },
+    {
+      "id": "d7",
+      "name": "Pedir pregunta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { chat_id: Number($json.chat_id), dry_run: $('Parámetros').first().json.dry_run } };"
+      },
+      "notes": "Repaso o quiz: [BS] Generar quiz ya prioriza el tema con el repaso más vencido."
+    },
+    {
+      "id": "d8",
+      "name": "Generar quiz",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_GENERAR",
+          "mode": "id",
+          "cachedResultName": "[BS] Generar quiz"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d9",
+      "name": "Pedir lección",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { chat_id: Number($json.chat_id), text: '/hoy', dry_run: $('Parámetros').first().json.dry_run } };"
+      },
+      "notes": "Con \"repaso+hoy\" se ejecuta después de la pregunta de repaso (la salida 0 del Switch va primero)."
+    },
+    {
+      "id": "d10",
+      "name": "Lección del día",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_LECCION",
+          "mode": "id",
+          "cachedResultName": "[BS] Lección del día"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d11",
+      "name": "Armar recordatorio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n// =============================================================================\n// estudio-lib.js — Funciones puras de la Fase 5: [BS] Lección del día,\n// [BS] Progreso y [BS] Envío diario. Probadas con scripts/test-estudio-lib.js\n// y copiadas a los nodos Code por scripts/build-estudio.js.\n//\n// Reutiliza rag-lib.js (markdown → HTML de Telegram y el detector de sintaxis\n// de Bootstrap 4). En Node se importa; en n8n el build pega rag-lib.js ANTES de\n// este archivo, así que sus funciones ya existen como globales.\n// =============================================================================\n\nconst ragLib = typeof findV4Syntax === 'function'\n  ? { markdownToTelegramHtml, findV4Syntax, escapeHtml }\n  : require('./rag-lib');\n\n// Cuánto de la página ve el modelo para escribir la lección. Las páginas\n// grandes (Navbar, Spacing) pasan de 40 000 caracteres; los primeros\n// fragmentos son la introducción y el uso básico, que es lo que va en una\n// lección. ~20 000 caracteres ≈ 5 000 tokens ≈ US$ 0,004 por tema, una vez.\nconst LESSON_SOURCE_CHARS = 20000;\nconst LESSON_MAX_CHARS = 2600;   // el prompt pide 2200; margen antes de rechazar\nconst LESSON_SECTIONS = ['Lo esencial', 'Ejemplo', 'Para recordar'];\n\nconst SECTION_LABEL = {\n  'getting-started': 'Getting started', layout: 'Layout', content: 'Content', forms: 'Forms',\n  components: 'Components', helpers: 'Helpers', utilities: 'Utilities', customize: 'Customize',\n};\n\n// -----------------------------------------------------------------------------\n// Entrada de [BS] Lección del día: del router (/hoy, /saltar, botones) o del\n// envío diario ({ chat_id, text: '/hoy' }).\n//   h:t:<order_index> → test     (\"Ponerme a prueba\")\n//   h:s:<order_index> → saltar   (\"Ya lo sé\")\n//   n:hoy             → hoy      (\"Siguiente lección\")\n// -----------------------------------------------------------------------------\nfunction parseLessonInput({ text, callback_data } = {}) {\n  const cb = String(callback_data ?? '');\n  let m = cb.match(/^h:([ts]):(\\d{1,4})$/);\n  if (m) return { action: m[1] === 't' ? 'test' : 'saltar', topic_order: Number(m[2]) };\n  if (/^\\/saltar\\b/i.test(String(text ?? '').trim())) return { action: 'saltar', topic_order: null };\n  return { action: 'hoy', topic_order: null };\n}\n\n// -----------------------------------------------------------------------------\n// buildLessonPrompt: turno de usuario. errors = motivos del intento anterior.\n// -----------------------------------------------------------------------------\nfunction buildLessonPrompt({ title, section, chunks, errors = [] }) {\n  const parts = [];\n  let used = 0;\n  for (const [i, c] of (chunks ?? []).entries()) {\n    const heading = Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : '';\n    const block = `[${i + 1}] (${heading})\\n${c.content}`;\n    if (used && used + block.length > LESSON_SOURCE_CHARS) break;\n    parts.push(block.slice(0, LESSON_SOURCE_CHARS));\n    used += block.length;\n  }\n  const lines = [\n    `Tema: ${title} (sección ${SECTION_LABEL[section] ?? section} de la documentación de Bootstrap 5.3)`,\n    '',\n    'Fragmentos de la página oficial, en orden:',\n    '',\n    parts.join('\\n\\n---\\n\\n'),\n    '',\n  ];\n  if (errors.length) lines.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  lines.push('Escribe la lección.');\n  return lines.join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// validateLesson: lista de errores (vacía = válida), redactados para el modelo.\n// lenient (último intento): el largo ya no rechaza si igual cabe en Telegram.\n// -----------------------------------------------------------------------------\nfunction validateLesson(markdown, { lenient = false } = {}) {\n  const md = String(markdown ?? '').trim();\n  const errors = [];\n  if (!md) {\n    errors.push('La respuesta vino vacía.');\n    return errors;\n  }\n  const max = lenient ? 3400 : LESSON_MAX_CHARS;\n  if (md.length > max) errors.push(`La lección tiene ${md.length} caracteres; el máximo es 2200. Acórtala.`);\n  const missing = LESSON_SECTIONS.filter((s) => !md.includes(`**${s}**`));\n  if (missing.length) errors.push(`Faltan las partes en negrita: ${missing.map((s) => `**${s}**`).join(', ')}.`);\n  if (!/```[\\w-]*\\n[\\s\\S]*?```/.test(md)) errors.push('Falta el bloque de código del ejemplo.');\n  // URLs solo fuera del código: dentro sí pueden ir (el <link> del CDN en Introduction).\n  const prose = md.replace(/```[\\w-]*\\n[\\s\\S]*?```/g, '');\n  if (/https?:\\/\\//i.test(prose)) errors.push('No incluyas URLs en el texto: el bot agrega el enlace oficial.');\n  const v4 = ragLib.findV4Syntax(md);\n  if (v4.length) errors.push(`El código tiene sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo 5.3.`);\n  return errors;\n}\n\n// El modelo a veces envuelve todo en ```markdown … ```: se quita esa envoltura.\nfunction cleanLesson(text) {\n  return String(text ?? '').trim().replace(/^```(?:markdown|md)?\\n([\\s\\S]*)\\n```$/i, '$1').trim();\n}\n\n// -----------------------------------------------------------------------------\n// formatLessonMessage: HTML del mensaje de /hoy. El enlace sale de study_path,\n// nunca del modelo.\n// -----------------------------------------------------------------------------\nfunction formatLessonMessage({ title, url, section, order_index, total, markdown }) {\n  const esc = ragLib.escapeHtml;\n  const head = `📖 <b>Lección del día · ${esc(title)}</b>\\n` +\n    `<i>${esc(SECTION_LABEL[section] ?? section)} · tema ${Number(order_index) + 1} de ${total} de la ruta</i>`;\n  const body = ragLib.markdownToTelegramHtml(markdown);\n  const link = `🔗 <a href=\"${esc(url)}\">Documentación oficial: ${esc(title)}</a>`;\n  return `${head}\\n\\n${body}\\n\\n${link}\\n\\nCuando termines de leer, ponte a prueba: 3 preguntas, apruebas con 2.`;\n}\n\nfunction routeFinishedMessage(total) {\n  return `🎉 <b>¡Terminaste la ruta!</b> Viste los ${total} temas de Bootstrap 5.3.\\n\\n` +\n    'Sigue con /quiz: ahora te pregunta sobre todo de tus temas más débiles y de los repasos que vencen.';\n}\n\nfunction skipMessage({ saltado, siguiente }) {\n  const esc = ragLib.escapeHtml;\n  if (!saltado) return 'No hay tema que saltar: ya terminaste la ruta. 🎉';\n  return `⏭️ Marqué <b>${esc(saltado)}</b> como visto.\\n` +\n    (siguiente ? `Lo siguiente en la ruta: <b>${esc(siguiente)}</b>.` : '¡Con eso terminaste la ruta! 🎉');\n}\n\nfunction reminderMessage(title) {\n  return `⏰ Hoy todavía no hiciste el test de <b>${ragLib.escapeHtml(title)}</b>. ` +\n    'Son 3 preguntas; con 2 aciertos pasas al siguiente tema.';\n}\n\n// -----------------------------------------------------------------------------\n// /hora: \"/hora 10 20\" → horas; \"/hora off\" / \"/hora on\"; \"/hora\" → consultar.\n// -----------------------------------------------------------------------------\nfunction parseHoraCommand(text) {\n  const arg = String(text ?? '').trim().replace(/^\\/hora(@\\w+)?/i, '').trim().toLowerCase();\n  if (!arg) return { hours: null, enabled: null };\n  if (/^(off|no|apagar|desactivar)$/.test(arg)) return { hours: null, enabled: false };\n  if (/^(on|si|sí|activar)$/.test(arg)) return { hours: null, enabled: true };\n  const nums = arg.split(/[\\s,;y]+/).filter(Boolean);\n  if (!nums.every((n) => /^\\d{1,2}$/.test(n))) return { error: true };\n  const hours = [...new Set(nums.map(Number))].sort((a, b) => a - b);\n  if (!hours.length || hours.length > 4 || hours.some((h) => h > 23)) return { error: true };\n  return { hours, enabled: true };\n}\n\nfunction formatHoraReply({ hours, enabled }, { error = false } = {}) {\n  const usage = 'Uso: <code>/hora 10 20</code> (hasta 4 horas, de 0 a 23, hora de Lima), ' +\n    '<code>/hora off</code> para apagar el envío diario y <code>/hora on</code> para encenderlo.';\n  if (error) return `No entendí esas horas. ${usage}`;\n  const fmt = (h) => `${String(h).padStart(2, '0')}:00`;\n  const hs = (hours ?? []).map(Number);\n  if (!enabled) return `🔕 Envío diario apagado. Tus horas guardadas: ${hs.map(fmt).join(' y ')}.\\n\\n${usage}`;\n  const [first, ...rest] = hs;\n  return `⏰ Envío diario: ${hs.map(fmt).join(' y ')} (hora de Lima).\\n` +\n    `• ${fmt(first)}: la lección de /hoy (antes, un repaso si tienes alguno vencido).\\n` +\n    (rest.length ? `• ${rest.map(fmt).join(', ')}: repaso, recordatorio del test o una pregunta de /quiz.\\n` : '') +\n    `\\n${usage}`;\n}\n\n// -----------------------------------------------------------------------------\n// /progreso: gráfico de QuickChart (Chart.js v2) y el texto que lo acompaña.\n// -----------------------------------------------------------------------------\nfunction buildProgressChart(secciones) {\n  const rows = secciones ?? [];\n  const pct = (a, b) => (Number(b) ? Math.round((100 * Number(a)) / Number(b)) : 0);\n  return {\n    type: 'horizontalBar',\n    data: {\n      labels: rows.map((s) => `${SECTION_LABEL[s.section] ?? s.section} (${s.vistos}/${s.temas})`),\n      datasets: [\n        { label: '% de temas vistos', backgroundColor: '#7952b3', data: rows.map((s) => pct(s.vistos, s.temas)) },\n        { label: '% dominados', backgroundColor: '#20c997', data: rows.map((s) => pct(s.dominados, s.temas)) },\n      ],\n    },\n    options: {\n      title: { display: true, text: 'Avance en la ruta de Bootstrap 5.3', fontSize: 18 },\n      legend: { position: 'bottom' },\n      scales: { xAxes: [{ ticks: { min: 0, max: 100, stepSize: 25 } }] },\n      plugins: { datalabels: { display: false } },\n    },\n  };\n}\n\n// Pie de foto de Telegram: máximo 1024 caracteres.\nfunction formatProgressCaption(r) {\n  const esc = ragLib.escapeHtml;\n  const temas = (r.secciones ?? []).reduce((a, s) => a + Number(s.temas), 0);\n  const vistos = (r.secciones ?? []).reduce((a, s) => a + Number(s.vistos), 0);\n  const resp = Number(r.respondidas ?? 0);\n  const acierto = resp ? Math.round((100 * Number(r.aciertos ?? 0)) / resp) : 0;\n  const lines = [\n    `📊 <b>Tu progreso</b>`,\n    `Ruta: ${vistos} de ${temas} temas vistos.`,\n    resp ? `Quiz: ${resp} respuestas, ${acierto} % de acierto.` : 'Quiz: todavía no respondiste preguntas.',\n    r.actual ? `Tema actual: <b>${esc(r.actual)}</b> (/hoy).` : 'Ruta terminada 🎉',\n  ];\n  if (Number(r.vencidos)) lines.push(`🔁 Repasos pendientes: ${r.vencidos} (/quiz los prioriza).`);\n  const deb = r.debiles ?? [];\n  if (deb.length) {\n    lines.push('', '<b>Temas más débiles</b>');\n    deb.forEach((d, i) => lines.push(`${i + 1}. ${esc(d.title)}: ${d.tasa} % (${d.correct}/${Number(d.correct) + Number(d.wrong)})`));\n  } else if (resp) {\n    lines.push('', 'Sin temas débiles por ahora 💪');\n  }\n  return lines.join('\\n').slice(0, 1024);\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  LESSON_SOURCE_CHARS, LESSON_MAX_CHARS, SECTION_LABEL,\n  parseLessonInput, buildLessonPrompt, validateLesson, cleanLesson, formatLessonMessage,\n  routeFinishedMessage, skipMessage, reminderMessage,\n  parseHoraCommand, formatHoraReply, buildProgressChart, formatProgressCaption,\n};\n\n\nreturn { json: { chat_id: Number($json.chat_id), dry_run: $('Parámetros').first().json.dry_run,\n  topic_order: $json.topic_order, html: reminderMessage($json.topic_title) } };"
+      }
+    },
+    {
+      "id": "d12",
+      "name": "¿dry_run recordatorio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d12-c",
+              "leftValue": "={{ $json.dry_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d13",
+      "name": "Enviar recordatorio",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        240
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.html }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🧠 Ponerme a prueba",
+                    "additionalFields": {
+                      "callback_data": "={{ 'h:t:' + $json.topic_order }}"
+                    }
+                  },
+                  {
+                    "text": "📖 Ver la lección",
+                    "additionalFields": {
+                      "callback_data": "n:hoy"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d14",
+      "name": "Leer horario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n// =============================================================================\n// estudio-lib.js — Funciones puras de la Fase 5: [BS] Lección del día,\n// [BS] Progreso y [BS] Envío diario. Probadas con scripts/test-estudio-lib.js\n// y copiadas a los nodos Code por scripts/build-estudio.js.\n//\n// Reutiliza rag-lib.js (markdown → HTML de Telegram y el detector de sintaxis\n// de Bootstrap 4). En Node se importa; en n8n el build pega rag-lib.js ANTES de\n// este archivo, así que sus funciones ya existen como globales.\n// =============================================================================\n\nconst ragLib = typeof findV4Syntax === 'function'\n  ? { markdownToTelegramHtml, findV4Syntax, escapeHtml }\n  : require('./rag-lib');\n\n// Cuánto de la página ve el modelo para escribir la lección. Las páginas\n// grandes (Navbar, Spacing) pasan de 40 000 caracteres; los primeros\n// fragmentos son la introducción y el uso básico, que es lo que va en una\n// lección. ~20 000 caracteres ≈ 5 000 tokens ≈ US$ 0,004 por tema, una vez.\nconst LESSON_SOURCE_CHARS = 20000;\nconst LESSON_MAX_CHARS = 2600;   // el prompt pide 2200; margen antes de rechazar\nconst LESSON_SECTIONS = ['Lo esencial', 'Ejemplo', 'Para recordar'];\n\nconst SECTION_LABEL = {\n  'getting-started': 'Getting started', layout: 'Layout', content: 'Content', forms: 'Forms',\n  components: 'Components', helpers: 'Helpers', utilities: 'Utilities', customize: 'Customize',\n};\n\n// -----------------------------------------------------------------------------\n// Entrada de [BS] Lección del día: del router (/hoy, /saltar, botones) o del\n// envío diario ({ chat_id, text: '/hoy' }).\n//   h:t:<order_index> → test     (\"Ponerme a prueba\")\n//   h:s:<order_index> → saltar   (\"Ya lo sé\")\n//   n:hoy             → hoy      (\"Siguiente lección\")\n// -----------------------------------------------------------------------------\nfunction parseLessonInput({ text, callback_data } = {}) {\n  const cb = String(callback_data ?? '');\n  let m = cb.match(/^h:([ts]):(\\d{1,4})$/);\n  if (m) return { action: m[1] === 't' ? 'test' : 'saltar', topic_order: Number(m[2]) };\n  if (/^\\/saltar\\b/i.test(String(text ?? '').trim())) return { action: 'saltar', topic_order: null };\n  return { action: 'hoy', topic_order: null };\n}\n\n// -----------------------------------------------------------------------------\n// buildLessonPrompt: turno de usuario. errors = motivos del intento anterior.\n// -----------------------------------------------------------------------------\nfunction buildLessonPrompt({ title, section, chunks, errors = [] }) {\n  const parts = [];\n  let used = 0;\n  for (const [i, c] of (chunks ?? []).entries()) {\n    const heading = Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : '';\n    const block = `[${i + 1}] (${heading})\\n${c.content}`;\n    if (used && used + block.length > LESSON_SOURCE_CHARS) break;\n    parts.push(block.slice(0, LESSON_SOURCE_CHARS));\n    used += block.length;\n  }\n  const lines = [\n    `Tema: ${title} (sección ${SECTION_LABEL[section] ?? section} de la documentación de Bootstrap 5.3)`,\n    '',\n    'Fragmentos de la página oficial, en orden:',\n    '',\n    parts.join('\\n\\n---\\n\\n'),\n    '',\n  ];\n  if (errors.length) lines.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  lines.push('Escribe la lección.');\n  return lines.join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// validateLesson: lista de errores (vacía = válida), redactados para el modelo.\n// lenient (último intento): el largo ya no rechaza si igual cabe en Telegram.\n// -----------------------------------------------------------------------------\nfunction validateLesson(markdown, { lenient = false } = {}) {\n  const md = String(markdown ?? '').trim();\n  const errors = [];\n  if (!md) {\n    errors.push('La respuesta vino vacía.');\n    return errors;\n  }\n  const max = lenient ? 3400 : LESSON_MAX_CHARS;\n  if (md.length > max) errors.push(`La lección tiene ${md.length} caracteres; el máximo es 2200. Acórtala.`);\n  const missing = LESSON_SECTIONS.filter((s) => !md.includes(`**${s}**`));\n  if (missing.length) errors.push(`Faltan las partes en negrita: ${missing.map((s) => `**${s}**`).join(', ')}.`);\n  if (!/```[\\w-]*\\n[\\s\\S]*?```/.test(md)) errors.push('Falta el bloque de código del ejemplo.');\n  // URLs solo fuera del código: dentro sí pueden ir (el <link> del CDN en Introduction).\n  const prose = md.replace(/```[\\w-]*\\n[\\s\\S]*?```/g, '');\n  if (/https?:\\/\\//i.test(prose)) errors.push('No incluyas URLs en el texto: el bot agrega el enlace oficial.');\n  const v4 = ragLib.findV4Syntax(md);\n  if (v4.length) errors.push(`El código tiene sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo 5.3.`);\n  return errors;\n}\n\n// El modelo a veces envuelve todo en ```markdown … ```: se quita esa envoltura.\nfunction cleanLesson(text) {\n  return String(text ?? '').trim().replace(/^```(?:markdown|md)?\\n([\\s\\S]*)\\n```$/i, '$1').trim();\n}\n\n// -----------------------------------------------------------------------------\n// formatLessonMessage: HTML del mensaje de /hoy. El enlace sale de study_path,\n// nunca del modelo.\n// -----------------------------------------------------------------------------\nfunction formatLessonMessage({ title, url, section, order_index, total, markdown }) {\n  const esc = ragLib.escapeHtml;\n  const head = `📖 <b>Lección del día · ${esc(title)}</b>\\n` +\n    `<i>${esc(SECTION_LABEL[section] ?? section)} · tema ${Number(order_index) + 1} de ${total} de la ruta</i>`;\n  const body = ragLib.markdownToTelegramHtml(markdown);\n  const link = `🔗 <a href=\"${esc(url)}\">Documentación oficial: ${esc(title)}</a>`;\n  return `${head}\\n\\n${body}\\n\\n${link}\\n\\nCuando termines de leer, ponte a prueba: 3 preguntas, apruebas con 2.`;\n}\n\nfunction routeFinishedMessage(total) {\n  return `🎉 <b>¡Terminaste la ruta!</b> Viste los ${total} temas de Bootstrap 5.3.\\n\\n` +\n    'Sigue con /quiz: ahora te pregunta sobre todo de tus temas más débiles y de los repasos que vencen.';\n}\n\nfunction skipMessage({ saltado, siguiente }) {\n  const esc = ragLib.escapeHtml;\n  if (!saltado) return 'No hay tema que saltar: ya terminaste la ruta. 🎉';\n  return `⏭️ Marqué <b>${esc(saltado)}</b> como visto.\\n` +\n    (siguiente ? `Lo siguiente en la ruta: <b>${esc(siguiente)}</b>.` : '¡Con eso terminaste la ruta! 🎉');\n}\n\nfunction reminderMessage(title) {\n  return `⏰ Hoy todavía no hiciste el test de <b>${ragLib.escapeHtml(title)}</b>. ` +\n    'Son 3 preguntas; con 2 aciertos pasas al siguiente tema.';\n}\n\n// -----------------------------------------------------------------------------\n// /hora: \"/hora 10 20\" → horas; \"/hora off\" / \"/hora on\"; \"/hora\" → consultar.\n// -----------------------------------------------------------------------------\nfunction parseHoraCommand(text) {\n  const arg = String(text ?? '').trim().replace(/^\\/hora(@\\w+)?/i, '').trim().toLowerCase();\n  if (!arg) return { hours: null, enabled: null };\n  if (/^(off|no|apagar|desactivar)$/.test(arg)) return { hours: null, enabled: false };\n  if (/^(on|si|sí|activar)$/.test(arg)) return { hours: null, enabled: true };\n  const nums = arg.split(/[\\s,;y]+/).filter(Boolean);\n  if (!nums.every((n) => /^\\d{1,2}$/.test(n))) return { error: true };\n  const hours = [...new Set(nums.map(Number))].sort((a, b) => a - b);\n  if (!hours.length || hours.length > 4 || hours.some((h) => h > 23)) return { error: true };\n  return { hours, enabled: true };\n}\n\nfunction formatHoraReply({ hours, enabled }, { error = false } = {}) {\n  const usage = 'Uso: <code>/hora 10 20</code> (hasta 4 horas, de 0 a 23, hora de Lima), ' +\n    '<code>/hora off</code> para apagar el envío diario y <code>/hora on</code> para encenderlo.';\n  if (error) return `No entendí esas horas. ${usage}`;\n  const fmt = (h) => `${String(h).padStart(2, '0')}:00`;\n  const hs = (hours ?? []).map(Number);\n  if (!enabled) return `🔕 Envío diario apagado. Tus horas guardadas: ${hs.map(fmt).join(' y ')}.\\n\\n${usage}`;\n  const [first, ...rest] = hs;\n  return `⏰ Envío diario: ${hs.map(fmt).join(' y ')} (hora de Lima).\\n` +\n    `• ${fmt(first)}: la lección de /hoy (antes, un repaso si tienes alguno vencido).\\n` +\n    (rest.length ? `• ${rest.map(fmt).join(', ')}: repaso, recordatorio del test o una pregunta de /quiz.\\n` : '') +\n    `\\n${usage}`;\n}\n\n// -----------------------------------------------------------------------------\n// /progreso: gráfico de QuickChart (Chart.js v2) y el texto que lo acompaña.\n// -----------------------------------------------------------------------------\nfunction buildProgressChart(secciones) {\n  const rows = secciones ?? [];\n  const pct = (a, b) => (Number(b) ? Math.round((100 * Number(a)) / Number(b)) : 0);\n  return {\n    type: 'horizontalBar',\n    data: {\n      labels: rows.map((s) => `${SECTION_LABEL[s.section] ?? s.section} (${s.vistos}/${s.temas})`),\n      datasets: [\n        { label: '% de temas vistos', backgroundColor: '#7952b3', data: rows.map((s) => pct(s.vistos, s.temas)) },\n        { label: '% dominados', backgroundColor: '#20c997', data: rows.map((s) => pct(s.dominados, s.temas)) },\n      ],\n    },\n    options: {\n      title: { display: true, text: 'Avance en la ruta de Bootstrap 5.3', fontSize: 18 },\n      legend: { position: 'bottom' },\n      scales: { xAxes: [{ ticks: { min: 0, max: 100, stepSize: 25 } }] },\n      plugins: { datalabels: { display: false } },\n    },\n  };\n}\n\n// Pie de foto de Telegram: máximo 1024 caracteres.\nfunction formatProgressCaption(r) {\n  const esc = ragLib.escapeHtml;\n  const temas = (r.secciones ?? []).reduce((a, s) => a + Number(s.temas), 0);\n  const vistos = (r.secciones ?? []).reduce((a, s) => a + Number(s.vistos), 0);\n  const resp = Number(r.respondidas ?? 0);\n  const acierto = resp ? Math.round((100 * Number(r.aciertos ?? 0)) / resp) : 0;\n  const lines = [\n    `📊 <b>Tu progreso</b>`,\n    `Ruta: ${vistos} de ${temas} temas vistos.`,\n    resp ? `Quiz: ${resp} respuestas, ${acierto} % de acierto.` : 'Quiz: todavía no respondiste preguntas.',\n    r.actual ? `Tema actual: <b>${esc(r.actual)}</b> (/hoy).` : 'Ruta terminada 🎉',\n  ];\n  if (Number(r.vencidos)) lines.push(`🔁 Repasos pendientes: ${r.vencidos} (/quiz los prioriza).`);\n  const deb = r.debiles ?? [];\n  if (deb.length) {\n    lines.push('', '<b>Temas más débiles</b>');\n    deb.forEach((d, i) => lines.push(`${i + 1}. ${esc(d.title)}: ${d.tasa} % (${d.correct}/${Number(d.correct) + Number(d.wrong)})`));\n  } else if (resp) {\n    lines.push('', 'Sin temas débiles por ahora 💪');\n  }\n  return lines.join('\\n').slice(0, 1024);\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  LESSON_SOURCE_CHARS, LESSON_MAX_CHARS, SECTION_LABEL,\n  parseLessonInput, buildLessonPrompt, validateLesson, cleanLesson, formatLessonMessage,\n  routeFinishedMessage, skipMessage, reminderMessage,\n  parseHoraCommand, formatHoraReply, buildProgressChart, formatProgressCaption,\n};\n\n\nreturn { json: { chat_id: Number($json.chat_id), dry_run: $json.dry_run === true, ...parseHoraCommand($json.text) } };"
+      }
+    },
+    {
+      "id": "d15",
+      "name": "¿Horas válidas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d15-c",
+              "leftValue": "={{ $json.error === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d16",
+      "name": "Guardar horario",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        880,
+        240
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- diario/02_hora.sql — [BS] Envío diario, nodo \"Guardar horario\"\n--\n-- /hora 10 20 → hours = {10,20}; /hora off → enabled = false; /hora on →\n-- enabled = true; /hora sola → solo consulta. Lo que viene NULL no se toca.\n-- Devuelve la configuración resultante.\n-- =============================================================================\n\nWITH x AS (\n  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, hours int[], enabled boolean)\n)\nINSERT INTO bot_settings AS s (chat_id, hours, enabled)\nSELECT chat_id, coalesce(hours, '{10,20}'), coalesce(enabled, true) FROM x\nON CONFLICT (chat_id) DO UPDATE\n   SET hours      = coalesce((SELECT hours FROM x), s.hours),\n       enabled    = coalesce((SELECT enabled FROM x), s.enabled),\n       updated_at = now()\nRETURNING s.hours, s.enabled;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $json.chat_id, hours: $json.hours, enabled: $json.enabled }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "NULL = no cambiar; sin argumentos solo consulta."
+    },
+    {
+      "id": "d17",
+      "name": "Respuesta horario",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n// =============================================================================\n// estudio-lib.js — Funciones puras de la Fase 5: [BS] Lección del día,\n// [BS] Progreso y [BS] Envío diario. Probadas con scripts/test-estudio-lib.js\n// y copiadas a los nodos Code por scripts/build-estudio.js.\n//\n// Reutiliza rag-lib.js (markdown → HTML de Telegram y el detector de sintaxis\n// de Bootstrap 4). En Node se importa; en n8n el build pega rag-lib.js ANTES de\n// este archivo, así que sus funciones ya existen como globales.\n// =============================================================================\n\nconst ragLib = typeof findV4Syntax === 'function'\n  ? { markdownToTelegramHtml, findV4Syntax, escapeHtml }\n  : require('./rag-lib');\n\n// Cuánto de la página ve el modelo para escribir la lección. Las páginas\n// grandes (Navbar, Spacing) pasan de 40 000 caracteres; los primeros\n// fragmentos son la introducción y el uso básico, que es lo que va en una\n// lección. ~20 000 caracteres ≈ 5 000 tokens ≈ US$ 0,004 por tema, una vez.\nconst LESSON_SOURCE_CHARS = 20000;\nconst LESSON_MAX_CHARS = 2600;   // el prompt pide 2200; margen antes de rechazar\nconst LESSON_SECTIONS = ['Lo esencial', 'Ejemplo', 'Para recordar'];\n\nconst SECTION_LABEL = {\n  'getting-started': 'Getting started', layout: 'Layout', content: 'Content', forms: 'Forms',\n  components: 'Components', helpers: 'Helpers', utilities: 'Utilities', customize: 'Customize',\n};\n\n// -----------------------------------------------------------------------------\n// Entrada de [BS] Lección del día: del router (/hoy, /saltar, botones) o del\n// envío diario ({ chat_id, text: '/hoy' }).\n//   h:t:<order_index> → test     (\"Ponerme a prueba\")\n//   h:s:<order_index> → saltar   (\"Ya lo sé\")\n//   n:hoy             → hoy      (\"Siguiente lección\")\n// -----------------------------------------------------------------------------\nfunction parseLessonInput({ text, callback_data } = {}) {\n  const cb = String(callback_data ?? '');\n  let m = cb.match(/^h:([ts]):(\\d{1,4})$/);\n  if (m) return { action: m[1] === 't' ? 'test' : 'saltar', topic_order: Number(m[2]) };\n  if (/^\\/saltar\\b/i.test(String(text ?? '').trim())) return { action: 'saltar', topic_order: null };\n  return { action: 'hoy', topic_order: null };\n}\n\n// -----------------------------------------------------------------------------\n// buildLessonPrompt: turno de usuario. errors = motivos del intento anterior.\n// -----------------------------------------------------------------------------\nfunction buildLessonPrompt({ title, section, chunks, errors = [] }) {\n  const parts = [];\n  let used = 0;\n  for (const [i, c] of (chunks ?? []).entries()) {\n    const heading = Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : '';\n    const block = `[${i + 1}] (${heading})\\n${c.content}`;\n    if (used && used + block.length > LESSON_SOURCE_CHARS) break;\n    parts.push(block.slice(0, LESSON_SOURCE_CHARS));\n    used += block.length;\n  }\n  const lines = [\n    `Tema: ${title} (sección ${SECTION_LABEL[section] ?? section} de la documentación de Bootstrap 5.3)`,\n    '',\n    'Fragmentos de la página oficial, en orden:',\n    '',\n    parts.join('\\n\\n---\\n\\n'),\n    '',\n  ];\n  if (errors.length) lines.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  lines.push('Escribe la lección.');\n  return lines.join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// validateLesson: lista de errores (vacía = válida), redactados para el modelo.\n// lenient (último intento): el largo ya no rechaza si igual cabe en Telegram.\n// -----------------------------------------------------------------------------\nfunction validateLesson(markdown, { lenient = false } = {}) {\n  const md = String(markdown ?? '').trim();\n  const errors = [];\n  if (!md) {\n    errors.push('La respuesta vino vacía.');\n    return errors;\n  }\n  const max = lenient ? 3400 : LESSON_MAX_CHARS;\n  if (md.length > max) errors.push(`La lección tiene ${md.length} caracteres; el máximo es 2200. Acórtala.`);\n  const missing = LESSON_SECTIONS.filter((s) => !md.includes(`**${s}**`));\n  if (missing.length) errors.push(`Faltan las partes en negrita: ${missing.map((s) => `**${s}**`).join(', ')}.`);\n  if (!/```[\\w-]*\\n[\\s\\S]*?```/.test(md)) errors.push('Falta el bloque de código del ejemplo.');\n  // URLs solo fuera del código: dentro sí pueden ir (el <link> del CDN en Introduction).\n  const prose = md.replace(/```[\\w-]*\\n[\\s\\S]*?```/g, '');\n  if (/https?:\\/\\//i.test(prose)) errors.push('No incluyas URLs en el texto: el bot agrega el enlace oficial.');\n  const v4 = ragLib.findV4Syntax(md);\n  if (v4.length) errors.push(`El código tiene sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo 5.3.`);\n  return errors;\n}\n\n// El modelo a veces envuelve todo en ```markdown … ```: se quita esa envoltura.\nfunction cleanLesson(text) {\n  return String(text ?? '').trim().replace(/^```(?:markdown|md)?\\n([\\s\\S]*)\\n```$/i, '$1').trim();\n}\n\n// -----------------------------------------------------------------------------\n// formatLessonMessage: HTML del mensaje de /hoy. El enlace sale de study_path,\n// nunca del modelo.\n// -----------------------------------------------------------------------------\nfunction formatLessonMessage({ title, url, section, order_index, total, markdown }) {\n  const esc = ragLib.escapeHtml;\n  const head = `📖 <b>Lección del día · ${esc(title)}</b>\\n` +\n    `<i>${esc(SECTION_LABEL[section] ?? section)} · tema ${Number(order_index) + 1} de ${total} de la ruta</i>`;\n  const body = ragLib.markdownToTelegramHtml(markdown);\n  const link = `🔗 <a href=\"${esc(url)}\">Documentación oficial: ${esc(title)}</a>`;\n  return `${head}\\n\\n${body}\\n\\n${link}\\n\\nCuando termines de leer, ponte a prueba: 3 preguntas, apruebas con 2.`;\n}\n\nfunction routeFinishedMessage(total) {\n  return `🎉 <b>¡Terminaste la ruta!</b> Viste los ${total} temas de Bootstrap 5.3.\\n\\n` +\n    'Sigue con /quiz: ahora te pregunta sobre todo de tus temas más débiles y de los repasos que vencen.';\n}\n\nfunction skipMessage({ saltado, siguiente }) {\n  const esc = ragLib.escapeHtml;\n  if (!saltado) return 'No hay tema que saltar: ya terminaste la ruta. 🎉';\n  return `⏭️ Marqué <b>${esc(saltado)}</b> como visto.\\n` +\n    (siguiente ? `Lo siguiente en la ruta: <b>${esc(siguiente)}</b>.` : '¡Con eso terminaste la ruta! 🎉');\n}\n\nfunction reminderMessage(title) {\n  return `⏰ Hoy todavía no hiciste el test de <b>${ragLib.escapeHtml(title)}</b>. ` +\n    'Son 3 preguntas; con 2 aciertos pasas al siguiente tema.';\n}\n\n// -----------------------------------------------------------------------------\n// /hora: \"/hora 10 20\" → horas; \"/hora off\" / \"/hora on\"; \"/hora\" → consultar.\n// -----------------------------------------------------------------------------\nfunction parseHoraCommand(text) {\n  const arg = String(text ?? '').trim().replace(/^\\/hora(@\\w+)?/i, '').trim().toLowerCase();\n  if (!arg) return { hours: null, enabled: null };\n  if (/^(off|no|apagar|desactivar)$/.test(arg)) return { hours: null, enabled: false };\n  if (/^(on|si|sí|activar)$/.test(arg)) return { hours: null, enabled: true };\n  const nums = arg.split(/[\\s,;y]+/).filter(Boolean);\n  if (!nums.every((n) => /^\\d{1,2}$/.test(n))) return { error: true };\n  const hours = [...new Set(nums.map(Number))].sort((a, b) => a - b);\n  if (!hours.length || hours.length > 4 || hours.some((h) => h > 23)) return { error: true };\n  return { hours, enabled: true };\n}\n\nfunction formatHoraReply({ hours, enabled }, { error = false } = {}) {\n  const usage = 'Uso: <code>/hora 10 20</code> (hasta 4 horas, de 0 a 23, hora de Lima), ' +\n    '<code>/hora off</code> para apagar el envío diario y <code>/hora on</code> para encenderlo.';\n  if (error) return `No entendí esas horas. ${usage}`;\n  const fmt = (h) => `${String(h).padStart(2, '0')}:00`;\n  const hs = (hours ?? []).map(Number);\n  if (!enabled) return `🔕 Envío diario apagado. Tus horas guardadas: ${hs.map(fmt).join(' y ')}.\\n\\n${usage}`;\n  const [first, ...rest] = hs;\n  return `⏰ Envío diario: ${hs.map(fmt).join(' y ')} (hora de Lima).\\n` +\n    `• ${fmt(first)}: la lección de /hoy (antes, un repaso si tienes alguno vencido).\\n` +\n    (rest.length ? `• ${rest.map(fmt).join(', ')}: repaso, recordatorio del test o una pregunta de /quiz.\\n` : '') +\n    `\\n${usage}`;\n}\n\n// -----------------------------------------------------------------------------\n// /progreso: gráfico de QuickChart (Chart.js v2) y el texto que lo acompaña.\n// -----------------------------------------------------------------------------\nfunction buildProgressChart(secciones) {\n  const rows = secciones ?? [];\n  const pct = (a, b) => (Number(b) ? Math.round((100 * Number(a)) / Number(b)) : 0);\n  return {\n    type: 'horizontalBar',\n    data: {\n      labels: rows.map((s) => `${SECTION_LABEL[s.section] ?? s.section} (${s.vistos}/${s.temas})`),\n      datasets: [\n        { label: '% de temas vistos', backgroundColor: '#7952b3', data: rows.map((s) => pct(s.vistos, s.temas)) },\n        { label: '% dominados', backgroundColor: '#20c997', data: rows.map((s) => pct(s.dominados, s.temas)) },\n      ],\n    },\n    options: {\n      title: { display: true, text: 'Avance en la ruta de Bootstrap 5.3', fontSize: 18 },\n      legend: { position: 'bottom' },\n      scales: { xAxes: [{ ticks: { min: 0, max: 100, stepSize: 25 } }] },\n      plugins: { datalabels: { display: false } },\n    },\n  };\n}\n\n// Pie de foto de Telegram: máximo 1024 caracteres.\nfunction formatProgressCaption(r) {\n  const esc = ragLib.escapeHtml;\n  const temas = (r.secciones ?? []).reduce((a, s) => a + Number(s.temas), 0);\n  const vistos = (r.secciones ?? []).reduce((a, s) => a + Number(s.vistos), 0);\n  const resp = Number(r.respondidas ?? 0);\n  const acierto = resp ? Math.round((100 * Number(r.aciertos ?? 0)) / resp) : 0;\n  const lines = [\n    `📊 <b>Tu progreso</b>`,\n    `Ruta: ${vistos} de ${temas} temas vistos.`,\n    resp ? `Quiz: ${resp} respuestas, ${acierto} % de acierto.` : 'Quiz: todavía no respondiste preguntas.',\n    r.actual ? `Tema actual: <b>${esc(r.actual)}</b> (/hoy).` : 'Ruta terminada 🎉',\n  ];\n  if (Number(r.vencidos)) lines.push(`🔁 Repasos pendientes: ${r.vencidos} (/quiz los prioriza).`);\n  const deb = r.debiles ?? [];\n  if (deb.length) {\n    lines.push('', '<b>Temas más débiles</b>');\n    deb.forEach((d, i) => lines.push(`${i + 1}. ${esc(d.title)}: ${d.tasa} % (${d.correct}/${Number(d.correct) + Number(d.wrong)})`));\n  } else if (resp) {\n    lines.push('', 'Sin temas débiles por ahora 💪');\n  }\n  return lines.join('\\n').slice(0, 1024);\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  LESSON_SOURCE_CHARS, LESSON_MAX_CHARS, SECTION_LABEL,\n  parseLessonInput, buildLessonPrompt, validateLesson, cleanLesson, formatLessonMessage,\n  routeFinishedMessage, skipMessage, reminderMessage,\n  parseHoraCommand, formatHoraReply, buildProgressChart, formatProgressCaption,\n};\n\n\nconst p = $('Leer horario').first().json;\nreturn { json: { chat_id: p.chat_id, dry_run: p.dry_run, action: 'hora',\n  html: p.error ? formatHoraReply({}, { error: true }) : formatHoraReply($json) } };"
+      }
+    },
+    {
+      "id": "d18",
+      "name": "¿dry_run horario?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d18-c",
+              "leftValue": "={{ $json.dry_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d19",
+      "name": "Enviar horario",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        380
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.html }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Cada hora": {
+      "main": [
+        [
+          {
+            "node": "Parámetros",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada": {
+      "main": [
+        [
+          {
+            "node": "¿/hora?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿/hora?": {
+      "main": [
+        [
+          {
+            "node": "Leer horario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parámetros",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parámetros": {
+      "main": [
+        [
+          {
+            "node": "Turnos de esta hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Turnos de esta hora": {
+      "main": [
+        [
+          {
+            "node": "Qué enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qué enviar": {
+      "main": [
+        [
+          {
+            "node": "Pedir pregunta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pedir lección",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Armar recordatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedir pregunta": {
+      "main": [
+        [
+          {
+            "node": "Generar quiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedir lección": {
+      "main": [
+        [
+          {
+            "node": "Lección del día",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar recordatorio": {
+      "main": [
+        [
+          {
+            "node": "¿dry_run recordatorio?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿dry_run recordatorio?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Enviar recordatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer horario": {
+      "main": [
+        [
+          {
+            "node": "¿Horas válidas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Horas válidas?": {
+      "main": [
+        [
+          {
+            "node": "Guardar horario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar horario": {
+      "main": [
+        [
+          {
+            "node": "Respuesta horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta horario": {
+      "main": [
+        [
+          {
+            "node": "¿dry_run horario?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿dry_run horario?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Enviar horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

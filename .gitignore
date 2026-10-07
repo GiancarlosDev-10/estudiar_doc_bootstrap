@@ -3,3 +3,5 @@
 !.env.example
 node_modules/
 tmp/
+ops/ids.local.json
+.export-scratch/

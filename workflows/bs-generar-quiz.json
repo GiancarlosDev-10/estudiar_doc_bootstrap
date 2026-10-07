@@ -1,0 +1,1020 @@
+{
+  "name": "[BS] Generar quiz",
+  "nodes": [
+    {
+      "id": "g1",
+      "name": "Entrada",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "Del router: { chat_id, text: \"/quiz [tema]\" }, el botón \"Otra pregunta\" (n:quiz) o \"Siguiente pregunta\" del test (h:n:<test_id>). De [BS] Lección del día / Envío diario: { chat_id, test_id? }. De [BS] Test Quiz: además { dry_run: true, force_level, rand }."
+    },
+    {
+      "id": "g2",
+      "name": "Preparar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// quiz-lib.js — Funciones puras de [BS] Generar quiz y [BS] Responder quiz.\n// Sin dependencias, probadas en local con scripts/test-quiz-lib.js y copiadas a\n// los nodos Code por scripts/build-quiz.js (mismo patrón que rag-lib.js).\n//\n// Regla heredada de app-ure: el código decide y el modelo redacta. El tema, la\n// ventana de fragmentos, el formato (1 de cada 3 es de completar) y la posición\n// de la respuesta correcta los decide este archivo, no el LLM.\n// =============================================================================\n\nconst QUIZ_LEVELS = ['basico', 'intermedio', 'avanzado'];\n\n// Cuántos fragmentos consecutivos ve el modelo según el nivel. La dificultad\n// sale de cuántas partes hay que combinar (regla de app-ure), así que el nivel\n// más alto necesita más material a la vista.\nconst WINDOW_BY_LEVEL = { basico: 2, intermedio: 3, avanzado: 4 };\nconst MAX_CHUNK_CHARS = 3000;\n\n// -----------------------------------------------------------------------------\n// pickWindow: elige fragmentos CONSECUTIVOS de la página del tema. seed = cuántas\n// preguntas de este tema se generaron ya para este chat: cada pregunta nueva cae\n// en la ventana siguiente y la página se recorre entera (en app-ure, ventanas\n// casi iguales hacían salir 3-5 preguntas de la misma página).\n// -----------------------------------------------------------------------------\nfunction pickWindow(chunks, seed, level) {\n  const size = WINDOW_BY_LEVEL[level] ?? 2;\n  if (chunks.length <= size) return chunks.slice();\n  const windows = Math.ceil(chunks.length / size);\n  let start = (seed % windows) * size;\n  // La última ventana puede quedar corta: se corre hacia atrás para que tenga\n  // el mismo tamaño que las demás.\n  start = Math.min(start, chunks.length - size);\n  return chunks.slice(start, start + size);\n}\n\n// -----------------------------------------------------------------------------\n// useCloze: 1 de cada 3 preguntas es de completar el espacio. Se usa un hash del\n// seed y no seed % 3, porque seed también elige la ventana (seed % ventanas):\n// con 3, 6 o 9 ventanas, los dos ciclos quedarían sincronizados y siempre las\n// mismas partes de la página saldrían como \"completar\" (lección de app-ure).\n// -----------------------------------------------------------------------------\nfunction useCloze(seed) {\n  let x = seed | 0;\n  x = Math.imul(x ^ (x >>> 16), 2246822507);\n  x = Math.imul(x ^ (x >>> 13), 3266489909);\n  return ((x ^ (x >>> 16)) >>> 0) % 3 === 0;\n}\n\nconst DIFFICULTY_GUIDE = {\n  basico:\n    'Básico: la respuesta correcta se puede señalar con UNA sola frase o un solo ejemplo de los fragmentos ' +\n    '(qué clase hace X, qué atributo activa Y). No pidas relacionar dos ideas distintas.',\n  intermedio:\n    'Intermedio: la pregunta obliga a conectar EXACTAMENTE dos ideas de los fragmentos (combinar dos clases, ' +\n    'aplicar una regla a un caso concreto, elegir la clase según el breakpoint). Si se responde con una sola ' +\n    'frase aislada, está mal clasificada.',\n  avanzado:\n    'Avanzado: la pregunta exige combinar al menos TRES ideas de fragmentos distintos o deducir una consecuencia ' +\n    'que los fragmentos no dicen literalmente (qué pasa si se omite un paso, qué combinación logra un resultado). ' +\n    'Si se responde con una sola frase, está mal clasificada.',\n};\n\nconst CLOZE_INSTRUCTIONS = [\n  'FORMATO DE ESTA PREGUNTA: completar el espacio en blanco.',\n  '\"question\" es una AFIRMACIÓN (sin signo de interrogación) con exactamente UN espacio escrito como ______',\n  '(seis guiones bajos), redactada en español con tus palabras (no copies una frase en inglés de los',\n  'fragmentos). Las 4 opciones son candidatos para ese espacio y las cuatro deben encajar',\n  'gramaticalmente en la oración. El espacio va sobre el concepto evaluado (una clase, un atributo, un valor),',\n  'nunca sobre un artículo o una preposición. PROHIBIDO que la respuesta correcta, o una variante evidente,',\n  'ya aparezca escrita en la afirmación.',\n].join('\\n');\n\n// -----------------------------------------------------------------------------\n// buildQuizPrompt: turno de usuario para el modelo. El system prompt fijo vive en\n// prompts/quiz.md. errors = motivos del intento anterior (si se reintenta).\n// -----------------------------------------------------------------------------\nfunction buildQuizPrompt({ title, level, cloze, chunks, recent = [], errors = [] }) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : ''})\\n${String(c.content).slice(0, MAX_CHUNK_CHARS)}`)\n    .join('\\n\\n---\\n\\n');\n  const parts = [\n    `Tema: ${title}`,\n    `Nivel: ${level}. ${DIFFICULTY_GUIDE[level] ?? DIFFICULTY_GUIDE.basico}`,\n    '',\n  ];\n  if (cloze) parts.push(CLOZE_INSTRUCTIONS, '');\n  parts.push('Fragmentos de la documentación:', '', fragmentos, '');\n  if (recent.length) {\n    parts.push('Preguntas recientes de este tema (no repitas ninguna ni preguntes lo mismo con otras palabras):',\n      ...recent.map((q) => `- ${q}`), '');\n  }\n  if (errors.length) {\n    parts.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  }\n  parts.push('Genera UNA pregunta en el JSON indicado.');\n  return parts.join('\\n');\n}\n\n// JSON Schema para response_format de OpenAI (structured outputs, strict).\n// Los mínimos y máximos se validan en validateQuiz, no en el schema.\nconst QUIZ_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['question', 'options', 'correct_index', 'explanation', 'source_fragment'],\n  properties: {\n    question: { type: 'string' },\n    options: { type: 'array', items: { type: 'string' } },\n    correct_index: { type: 'integer' },\n    explanation: { type: 'string' },\n    source_fragment: { type: 'integer' },\n  },\n};\n\nfunction parseQuizJson(text) {\n  try {\n    const s = String(text ?? '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/```$/, '');\n    const o = JSON.parse(s);\n    return o && typeof o === 'object' ? o : null;\n  } catch { return null; }\n}\n\nconst BLANK = '______';\nconst norm = (s) => String(s ?? '').toLowerCase().replace(/[`*_.,;:¿?¡!\"'()]/g, ' ').replace(/\\s+/g, ' ').trim();\n// Opciones que el modelo a veces numera él mismo (\"A) …\"): las letras las pone el código.\nconst stripLabel = (s) => String(s ?? '').trim().replace(/^[A-Da-d][).:-]\\s+/, '');\n\n// Sintaxis de Bootstrap 4: no puede aparecer en ninguna opción de un quiz de 5.3.\nconst V4_IN_OPTION = /\\b(ml|mr|pl|pr)-(\\d|auto)\\b|data-(toggle|target|dismiss)=?|\\bfloat-(left|right)\\b|\\bbadge-pill\\b|\\bform-group\\b|\\bcustom-select\\b|\\bjumbotron\\b/;\n\n// -----------------------------------------------------------------------------\n// validateQuiz: devuelve la pregunta normalizada y la lista de errores (vacía =\n// válida). Cada error está redactado para dárselo al modelo en el reintento.\n// -----------------------------------------------------------------------------\n// lenient (último intento): las reglas de estilo (largo de las opciones) ya no\n// rechazan la pregunta; las de fondo (v4, respuesta regalada, repetidas) sí.\nfunction validateQuiz(raw, { cloze, nFragments, lenient = false }) {\n  const errors = [];\n  if (!raw) return { quiz: null, errors: ['La respuesta no era un JSON válido.'] };\n  const quiz = {\n    question: String(raw.question ?? '').trim().replace(/_{3,}/g, BLANK),\n    options: Array.isArray(raw.options) ? raw.options.map(stripLabel) : [],\n    correct_index: Number(raw.correct_index),\n    explanation: String(raw.explanation ?? '').trim(),\n    source_fragment: Number(raw.source_fragment),\n  };\n  const { question, options, correct_index: ci, explanation } = quiz;\n\n  if (!question || question.length > 400) errors.push('\"question\" vacía o de más de 400 caracteres.');\n  if (!explanation || explanation.length > 800) errors.push('\"explanation\" vacía o de más de 800 caracteres.');\n  if (options.length !== 4) errors.push(`Debe haber exactamente 4 opciones (hubo ${options.length}).`);\n  if (options.some((o) => !o || o.length > 160)) errors.push('Cada opción debe tener texto y menos de 160 caracteres.');\n  if (new Set(options.map(norm)).size !== options.length) errors.push('Hay opciones repetidas.');\n  if (!Number.isInteger(ci) || ci < 0 || ci >= options.length) errors.push('\"correct_index\" fuera de rango.');\n  if (!Number.isInteger(quiz.source_fragment) || quiz.source_fragment < 1 || quiz.source_fragment > nFragments) {\n    errors.push(`\"source_fragment\" debe ser un número de fragmento entre 1 y ${nFragments}.`);\n  }\n  if (options.some((o) => /\\b(todas|ninguna) de las anteriores\\b/i.test(o))) {\n    errors.push('Prohibido \"todas/ninguna de las anteriores\".');\n  }\n\n  // Largo parecido (regla de app-ure): solo cuando las opciones son frases. Con\n  // nombres de clase (`ms-3` frente a `justify-content-center`) o combinaciones\n  // de clases, la proporción no dice nada de cuál es la correcta.\n  const lens = options.map((o) => o.length);\n  const allCode = options.every((o) => /^`[^`]+`$/.test(o));\n  if (!lenient && !allCode && options.length === 4 && Math.min(...lens) >= 25) {\n    if (Math.max(...lens) > Math.min(...lens) * 1.25) {\n      errors.push('La opción más larga supera a la más corta en más del 25 %: empareja los largos.');\n    }\n    if (Number.isInteger(ci) && lens[ci] === Math.max(...lens) && lens.filter((l) => l === lens[ci]).length === 1) {\n      errors.push('La opción correcta no puede ser la más larga del grupo.');\n    }\n  }\n\n  if (cloze) {\n    const blanks = (question.match(/______/g) || []).length;\n    if (blanks !== 1) errors.push(`Formato completar: debe haber exactamente un ______ (hubo ${blanks}).`);\n    const ans = norm(options[ci]);\n    if (ans && norm(question.replace(BLANK, ' ')).includes(ans)) {\n      errors.push('Formato completar: la respuesta correcta ya aparece escrita en la afirmación.');\n    }\n  }\n\n  // Ni como distractor: las incorrectas también tienen que ser material real de 5.3.\n  const v4 = options.filter((o) => V4_IN_OPTION.test(o));\n  if (v4.length) errors.push(`Opciones con sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo clases y atributos de 5.3.`);\n  return { quiz, errors };\n}\n\n// -----------------------------------------------------------------------------\n// shuffleOptions: el código decide dónde queda la correcta. Los modelos tienden\n// a ponerla siempre en la misma posición (a menudo la B), y eso se aprende.\n// rand se inyecta para poder probarlo.\n// -----------------------------------------------------------------------------\nfunction shuffleOptions(quiz, rand = Math.random) {\n  const idx = quiz.options.map((_, i) => i);\n  for (let i = idx.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [idx[i], idx[j]] = [idx[j], idx[i]];\n  }\n  return { ...quiz, options: idx.map((i) => quiz.options[i]), correct_index: idx.indexOf(quiz.correct_index) };\n}\n\n// -----------------------------------------------------------------------------\n// HTML de Telegram. El modelo escribe clases entre `comillas invertidas`; todo\n// lo demás se escapa.\n// -----------------------------------------------------------------------------\nfunction inlineHtml(s) {\n  return String(s ?? '')\n    .split(/(`[^`\\n]+`)/g)\n    .map((p) => {\n      const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n      return /^`[^`\\n]+`$/.test(p) ? `<code>${esc(p.slice(1, -1))}</code>` : esc(p).replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<b>$1</b>');\n    })\n    .join('');\n}\n\nconst LETTERS = ['A', 'B', 'C', 'D'];\nconst LEVEL_LABEL = { basico: 'básico', intermedio: 'intermedio', avanzado: 'avanzado' };\n\n// origin (Fase 5): 'hoy' = pregunta del test de la lección (test_pos de 3),\n// 'repaso' = tema con el repaso vencido; lo demás, quiz normal.\nconst TEST_SIZE = 3;\nfunction quizHeader({ title, level, format, origin, test_pos }) {\n  const t = inlineHtml(title);\n  const head = origin === 'hoy' ? `📝 <b>Test de la lección · ${t}</b> (${test_pos}/${TEST_SIZE})`\n    : origin === 'repaso' ? `🔁 <b>Repaso · ${t}</b>`\n      : `🧠 <b>Quiz · ${t}</b>`;\n  return `${head}\\n<i>Nivel ${LEVEL_LABEL[level] ?? level}${format === 'cloze' ? ' · completa el espacio' : ''}</i>`;\n}\n\n// Mensaje con la pregunta (los botones A-D los agrega el nodo de Telegram).\nfunction formatQuestionMessage({ title, level, format, question, options, origin, test_pos }) {\n  const opts = options.map((o, i) => `<b>${LETTERS[i]})</b> ${inlineHtml(o)}`).join('\\n');\n  return `${quizHeader({ title, level, format, origin, test_pos })}\\n\\n${inlineHtml(question)}\\n\\n${opts}`;\n}\n\n// Mensaje editado después de responder: marca la elegida y la correcta, y\n// agrega la explicación, la fuente (de la metadata, nunca del LLM) y el progreso.\nfunction formatAnsweredMessage({ title, level, format, question, options, origin, test_pos }, r) {\n  const opts = options.map((o, i) => {\n    const mark = i === r.correct_index ? '✅' : i === r.selected_index ? '❌' : '▫️';\n    return `${mark} <b>${LETTERS[i]})</b> ${inlineHtml(o)}`;\n  }).join('\\n');\n  const verdict = r.is_correct ? '<b>¡Correcto!</b>' : `<b>Incorrecto.</b> La respuesta era la ${LETTERS[r.correct_index]}.`;\n  const lines = [quizHeader({ title, level, format, origin, test_pos }), '', inlineHtml(question), '', opts, '',\n    `${verdict} ${inlineHtml(r.explanation)}`, '',\n    `📚 <a href=\"${String(r.source_url).replace(/\"/g, '&quot;')}\">Fuente oficial</a>`];\n  const progress = progressLine(level, r);\n  if (progress) lines.push('', progress);\n  const test = testLine(r.test);\n  if (test) lines.push('', test);\n  return lines.join('\\n');\n}\n\n// Resultado del test de la lección: solo en la respuesta que lo cierra\n// (just_finished), así no se repite si hay doble toque.\nfunction testLine(t) {\n  if (!t || !t.just_finished) return '';\n  if (t.passed) {\n    return `🎉 <b>Test superado</b> (${t.correct}/${t.total}). El tema queda visto` +\n      (t.next_topic ? `; lo siguiente en la ruta es <b>${inlineHtml(t.next_topic)}</b>.` : ' y terminaste la ruta.');\n  }\n  return `📚 <b>Test: ${t.correct}/${t.total}.</b> Necesitas 2 aciertos para pasar de tema: repasa la lección y vuelve a intentarlo.`;\n}\n\n// -----------------------------------------------------------------------------\n// nextButton: el único botón que queda en el mensaje después de responder.\n// Telegram limita callback_data a 64 bytes: h:n:<uuid> ocupa 40.\n// -----------------------------------------------------------------------------\nfunction nextButton(r) {\n  const t = r?.test;\n  if (t && !t.finished) return { text: `Siguiente pregunta (${t.answered + 1}/${t.total}) ➡️`, data: `h:n:${t.test_id}` };\n  if (t && t.just_finished && t.passed) return { text: '📖 Siguiente lección', data: 'n:hoy' };\n  if (t && t.just_finished) return { text: '🔁 Repetir test', data: `h:t:${t.topic_order}` };\n  return { text: 'Otra pregunta ➡️', data: 'n:quiz' };\n}\n\n// Callback \"Siguiente pregunta\" del test: h:n:<uuid> → uuid; si no, null.\nfunction testIdFromCallback(data) {\n  const m = String(data ?? '').match(/^h:n:([0-9a-f-]{36})$/);\n  return m ? m[1] : null;\n}\n\nfunction progressLine(oldLevel, r) {\n  const out = [];\n  if (r.level_changed) {\n    const up = QUIZ_LEVELS.indexOf(r.level) > QUIZ_LEVELS.indexOf(oldLevel);\n    out.push(`${up ? '⬆️ Subes' : '⬇️ Bajas'} a nivel ${LEVEL_LABEL[r.level] ?? r.level} en este tema.`);\n  }\n  if (r.topic_status === 'dominado') out.push('🏆 Tema dominado.');\n  if (r.interval_days) out.push(`🔁 Próximo repaso de este tema: en ${r.interval_days} día${r.interval_days === 1 ? '' : 's'}.`);\n  return out.join('\\n');\n}\n\n// Texto corto del aviso del botón (answerCallbackQuery, máx. 200 caracteres).\nfunction answerToast(r) {\n  switch (r?.status) {\n    case 'ok': return r.is_correct ? '✅ ¡Correcta!' : '❌ Incorrecta';\n    case 'already_answered': return 'Ya respondiste esta pregunta.';\n    default: return 'Esta pregunta ya no está disponible.';\n  }\n}\n\n// -----------------------------------------------------------------------------\n// Deduplicación semántica (corrección de app-ure, que solo comparaba texto\n// exacto). Se embebe la pregunta con gemini-embedding-2 y se compara por coseno\n// con las preguntas recientes del mismo tema.\n//\n// dedupText: qué se embebe. variant 'B' (la que se usa) = la pregunta CON su\n// respuesta correcta: en una de completar el concepto evaluado está justo en el\n// espacio en blanco, y sin la respuesta \"integrity ______\" y \"¿qué atributo…?\"\n// no se parecen. 'A' = solo el enunciado (se conserva para la medición).\n// Prefijo simétrico \"task: sentence similarity\": aquí se comparan preguntas\n// con preguntas, no una consulta con un documento (eso es el asimétrico del RAG).\n// -----------------------------------------------------------------------------\n// Umbral calibrado con 70 pares reales (eval/fase5-dedup.json): con la\n// variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el límite\n// (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que separe:\n// un duplicado quedaba en 0,913 y un par distinto en 0,931.\n// Un falso positivo cuesta un reintento; un falso negativo, una pregunta repetida.\nconst DEDUP_THRESHOLD = 0.935;\n// Contra cuántas preguntas recientes del mismo tema se compara.\nconst DEDUP_RECENT = 20;\n\nfunction dedupText({ question, options, correct_index, format }, variant = 'B') {\n  const clean = (s) => String(s ?? '').replace(/`/g, '').replace(/\\s+/g, ' ').trim();\n  const q = clean(question);\n  const answer = clean(options?.[correct_index]);\n  let text = q;\n  if (variant === 'B') text = format === 'cloze' && q.includes(BLANK) ? q.replace(BLANK, answer) : `${q} Respuesta: ${answer}`;\n  return `task: sentence similarity | query: ${text}`;\n}\n\nfunction cosine(a, b) {\n  let dot = 0, na = 0, nb = 0;\n  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }\n  return na && nb ? dot / Math.sqrt(na * nb) : 0;\n}\n\n// \"/quiz navbar\" → \"navbar\"; \"/quiz css grid\" → \"css-grid\"; \"/quiz\" → null.\nfunction topicHint(text) {\n  const h = String(text ?? '').trim().replace(/^\\/quiz(@\\w+)?/i, '').trim().toLowerCase().replace(/\\s+/g, '-');\n  return h ? h.slice(0, 40) : null;\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  WINDOW_BY_LEVEL, QUIZ_SCHEMA, BLANK,\n  pickWindow, useCloze, buildQuizPrompt, parseQuizJson, validateQuiz, shuffleOptions,\n  inlineHtml, formatQuestionMessage, formatAnsweredMessage, answerToast, topicHint,\n  TEST_SIZE, testLine, nextButton, testIdFromCallback,\n  DEDUP_THRESHOLD, DEDUP_RECENT, dedupText, cosine,\n};\n\n\nconst dry_run = $json.dry_run === true;\nreturn { json: {\n  chat_id: Number($json.chat_id),\n  dry_run,\n  hint: topicHint($json.text),\n  // Test de la lección: lo manda [BS] Lección del día (test_id) o el botón\n  // \"Siguiente pregunta\" (h:n:<test_id>).\n  test_id: $json.test_id ?? testIdFromCallback($json.callback_data),\n  // 70 % tema actual / 30 % tema débil (sql/quiz/01_tema.sql). El azar lo pone\n  // el código; el arnés puede fijarlo para probar las dos ramas.\n  rand: dry_run && typeof $json.rand === 'number' ? $json.rand : Math.random(),\n  callback_query_id: $json.callback_query_id ?? null,\n  message_id: $json.message_id ?? null,\n  // Solo en el arnés: probar un nivel sin tener que responder 3 seguidas.\n  force_level: dry_run && [\"basico\",\"intermedio\",\"avanzado\"].includes($json.force_level) ? $json.force_level : null,\n} };"
+      }
+    },
+    {
+      "id": "g3",
+      "name": "¿Botón?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g3-c",
+              "leftValue": "={{ $json.callback_query_id ?? \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Si vino del botón \"Otra pregunta\", primero se responde el toque para que Telegram deje de mostrar el reloj."
+    },
+    {
+      "id": "g4",
+      "name": "Aceptar botón",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        -140
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.callback_query_id }}",
+        "additionalFields": {
+          "text": "Preparando otra pregunta…"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "g4b",
+      "name": "Reclamar botón",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        770,
+        -140
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- quiz/04_reclamar.sql — [BS] Generar quiz, nodo \"Reclamar botón\"\n--\n-- Solo cuando la pregunta se pidió con el botón \"Otra pregunta\". Devuelve\n-- SIEMPRE una fila: claimed = true si esta ejecución es la primera para ese\n-- botón (ver sql/003_quiz_botones.sql). Con un doble toque, la segunda\n-- ejecución recibe false y no genera otra pregunta.\n-- =============================================================================\n\nWITH ins AS (\n  INSERT INTO quiz_next_clicks (chat_id, message_id)\n  SELECT x.chat_id, x.message_id\n    FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, message_id bigint)\n  ON CONFLICT DO NOTHING\n  RETURNING 1\n)\nSELECT count(*) > 0 AS claimed FROM ins;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $('Preparar').first().json.chat_id, message_id: $('Preparar').first().json.message_id }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Un doble toque en \"Otra pregunta\" no genera dos preguntas: solo la primera ejecución reclama el botón (sql/003_quiz_botones.sql)."
+    },
+    {
+      "id": "g4c",
+      "name": "¿Primera vez?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g4c-c",
+              "leftValue": "={{ $json.claimed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "false = otro toque del mismo botón ya está generando la pregunta: esta ejecución termina aquí."
+    },
+    {
+      "id": "g5",
+      "name": "Elegir tema",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- quiz/01_tema.sql — [BS] Generar quiz, nodo \"Elegir tema\"\n--\n-- Devuelve SIEMPRE una fila (p LEFT JOIN elegido): si no hay tema, topic_key\n-- viene NULL y el workflow responde \"no encontré ese tema\".\n--\n-- Selección (Fase 5, regla del CLAUDE.md). El código decide, no el LLM:\n--   0. test_id (botón del test de la lección) → el tema de ese test.\n--   1. \"/quiz navbar\" → el tema que coincida con lo pedido (exacto primero),\n--      aunque esté fuera de la ruta (webpack, download…).\n--   2. Si hay repasos vencidos (next_review_at <= now()), el más atrasado.\n--   3. Si no, con rand < 0,7 el tema actual de la ruta (current_topic);\n--      con rand >= 0,7 el tema más débil. Si el preferido no existe, el otro.\n--   4. Ruta terminada y sin temas débiles: el que hace más tiempo no se ve.\n-- rand lo pone el nodo \"Preparar\" (Math.random): así la prueba puede fijarlo.\n--\n-- Tema débil = la peor tasa de acierto entre los temas con al menos 2\n-- respuestas y al menos un fallo, sin contar el actual. Sin el \"al menos un\n-- fallo\", con todo al 100 % el 30 % caería en un tema que ya se domina.\n--\n-- seed = cuántas preguntas de este tema se generaron ya para este chat: rota la\n-- ventana de fragmentos. total = cuántas preguntas tiene el chat en todos los\n-- temas: decide el formato (1 de cada 3 es de completar). recent = las últimas\n-- 5 preguntas del tema, para pedirle al modelo que no se repita.\n-- test_asked = preguntas ya generadas en el test (máximo 3).\n-- =============================================================================\n\nWITH p AS (\n  SELECT * FROM jsonb_to_record($1::jsonb)\n         AS x(chat_id bigint, hint text, test_id uuid, rand float8)\n),\nactual AS (\n  SELECT current_topic(p.chat_id) AS topic_key FROM p\n),\ntest AS (\n  SELECT t.id, t.topic_key, t.finished_at,\n         (SELECT count(*) FROM quiz_questions q WHERE q.test_id = t.id) AS asked\n    FROM lesson_tests t, p\n   WHERE t.id = p.test_id AND t.chat_id = p.chat_id\n),\ncandidatos AS (\n  SELECT sp.topic_key, sp.title, sp.url, sp.order_index,\n         tp.level, tp.next_review_at, tp.last_seen_at,\n         (tp.next_review_at <= now()) IS TRUE AS vencido,\n         sp.topic_key = a.topic_key AS es_actual,\n         CASE WHEN coalesce(tp.correct + tp.wrong, 0) >= 2 AND tp.wrong > 0\n                   AND sp.topic_key IS DISTINCT FROM a.topic_key\n              THEN tp.correct::float8 / (tp.correct + tp.wrong) END AS tasa\n    FROM study_path sp\n    CROSS JOIN p\n    CROSS JOIN actual a\n    LEFT JOIN topic_progress tp ON tp.chat_id = p.chat_id AND tp.topic_key = sp.topic_key\n   WHERE EXISTS (SELECT 1 FROM doc_chunks c WHERE c.topic_key = sp.topic_key AND c.embedding IS NOT NULL)\n),\nelegido AS (\n  SELECT c.*,\n         CASE WHEN p.test_id IS NOT NULL THEN 'hoy'\n              WHEN p.hint IS NOT NULL THEN 'pedido'\n              WHEN c.vencido THEN 'repaso'\n              WHEN c.es_actual THEN 'ruta'\n              WHEN c.tasa IS NOT NULL THEN 'debil'\n              ELSE 'libre' END AS motivo\n    FROM candidatos c, p\n   WHERE CASE WHEN p.test_id IS NOT NULL THEN c.topic_key = (SELECT topic_key FROM test)\n              WHEN p.hint IS NOT NULL\n              THEN c.topic_key ILIKE '%' || p.hint || '%' OR c.title ILIKE '%' || replace(p.hint, '-', ' ') || '%'\n              ELSE c.order_index >= 0 OR c.vencido END\n   ORDER BY (p.hint IS NOT NULL AND (c.topic_key ILIKE '%/' || p.hint\n                                     OR lower(c.title) = replace(p.hint, '-', ' '))) DESC,\n            c.vencido DESC,\n            CASE WHEN c.vencido THEN c.next_review_at END,  -- solo ordena los vencidos\n            CASE WHEN p.rand < 0.7 THEN c.es_actual IS TRUE ELSE c.tasa IS NOT NULL END DESC,\n            c.tasa ASC NULLS LAST,\n            c.es_actual IS TRUE DESC,\n            c.last_seen_at ASC NULLS FIRST,\n            c.order_index\n   LIMIT 1\n)\nSELECT e.topic_key, e.title, e.url, coalesce(e.level, 'basico') AS level, e.motivo, p.hint,\n       p.test_id, (SELECT asked FROM test) AS test_asked, (SELECT finished_at IS NOT NULL FROM test) AS test_finished,\n       (SELECT count(*) FROM quiz_questions q WHERE q.chat_id = p.chat_id AND q.topic_key = e.topic_key) AS seed,\n       (SELECT count(*) FROM quiz_questions q WHERE q.chat_id = p.chat_id) AS total,\n       (SELECT coalesce(json_agg(r.question ORDER BY r.created_at DESC), '[]'::json)\n          FROM (SELECT q.question, q.created_at FROM quiz_questions q\n                 WHERE q.chat_id = p.chat_id AND q.topic_key = e.topic_key\n                 ORDER BY q.created_at DESC LIMIT 5) r) AS recent,\n       (SELECT coalesce(json_agg(json_build_object('id', c.id, 'content', c.content, 'url', c.url,\n                                                   'heading_path', c.heading_path) ORDER BY c.order_index), '[]'::json)\n          FROM doc_chunks c WHERE c.topic_key = e.topic_key AND c.embedding IS NOT NULL) AS chunks\n  FROM p\n  LEFT JOIN elegido e ON true;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $('Preparar').first().json.chat_id, hint: $('Preparar').first().json.hint, test_id: $('Preparar').first().json.test_id, rand: $('Preparar').first().json.rand }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Siempre 1 fila: tema, nivel, seed, últimas 5 preguntas y fragmentos (sql/quiz/01_tema.sql). Selección: test → pedido → repaso vencido → 70 % ruta / 30 % tema débil."
+    },
+    {
+      "id": "g6",
+      "name": "Armar prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// quiz-lib.js — Funciones puras de [BS] Generar quiz y [BS] Responder quiz.\n// Sin dependencias, probadas en local con scripts/test-quiz-lib.js y copiadas a\n// los nodos Code por scripts/build-quiz.js (mismo patrón que rag-lib.js).\n//\n// Regla heredada de app-ure: el código decide y el modelo redacta. El tema, la\n// ventana de fragmentos, el formato (1 de cada 3 es de completar) y la posición\n// de la respuesta correcta los decide este archivo, no el LLM.\n// =============================================================================\n\nconst QUIZ_LEVELS = ['basico', 'intermedio', 'avanzado'];\n\n// Cuántos fragmentos consecutivos ve el modelo según el nivel. La dificultad\n// sale de cuántas partes hay que combinar (regla de app-ure), así que el nivel\n// más alto necesita más material a la vista.\nconst WINDOW_BY_LEVEL = { basico: 2, intermedio: 3, avanzado: 4 };\nconst MAX_CHUNK_CHARS = 3000;\n\n// -----------------------------------------------------------------------------\n// pickWindow: elige fragmentos CONSECUTIVOS de la página del tema. seed = cuántas\n// preguntas de este tema se generaron ya para este chat: cada pregunta nueva cae\n// en la ventana siguiente y la página se recorre entera (en app-ure, ventanas\n// casi iguales hacían salir 3-5 preguntas de la misma página).\n// -----------------------------------------------------------------------------\nfunction pickWindow(chunks, seed, level) {\n  const size = WINDOW_BY_LEVEL[level] ?? 2;\n  if (chunks.length <= size) return chunks.slice();\n  const windows = Math.ceil(chunks.length / size);\n  let start = (seed % windows) * size;\n  // La última ventana puede quedar corta: se corre hacia atrás para que tenga\n  // el mismo tamaño que las demás.\n  start = Math.min(start, chunks.length - size);\n  return chunks.slice(start, start + size);\n}\n\n// -----------------------------------------------------------------------------\n// useCloze: 1 de cada 3 preguntas es de completar el espacio. Se usa un hash del\n// seed y no seed % 3, porque seed también elige la ventana (seed % ventanas):\n// con 3, 6 o 9 ventanas, los dos ciclos quedarían sincronizados y siempre las\n// mismas partes de la página saldrían como \"completar\" (lección de app-ure).\n// -----------------------------------------------------------------------------\nfunction useCloze(seed) {\n  let x = seed | 0;\n  x = Math.imul(x ^ (x >>> 16), 2246822507);\n  x = Math.imul(x ^ (x >>> 13), 3266489909);\n  return ((x ^ (x >>> 16)) >>> 0) % 3 === 0;\n}\n\nconst DIFFICULTY_GUIDE = {\n  basico:\n    'Básico: la respuesta correcta se puede señalar con UNA sola frase o un solo ejemplo de los fragmentos ' +\n    '(qué clase hace X, qué atributo activa Y). No pidas relacionar dos ideas distintas.',\n  intermedio:\n    'Intermedio: la pregunta obliga a conectar EXACTAMENTE dos ideas de los fragmentos (combinar dos clases, ' +\n    'aplicar una regla a un caso concreto, elegir la clase según el breakpoint). Si se responde con una sola ' +\n    'frase aislada, está mal clasificada.',\n  avanzado:\n    'Avanzado: la pregunta exige combinar al menos TRES ideas de fragmentos distintos o deducir una consecuencia ' +\n    'que los fragmentos no dicen literalmente (qué pasa si se omite un paso, qué combinación logra un resultado). ' +\n    'Si se responde con una sola frase, está mal clasificada.',\n};\n\nconst CLOZE_INSTRUCTIONS = [\n  'FORMATO DE ESTA PREGUNTA: completar el espacio en blanco.',\n  '\"question\" es una AFIRMACIÓN (sin signo de interrogación) con exactamente UN espacio escrito como ______',\n  '(seis guiones bajos), redactada en español con tus palabras (no copies una frase en inglés de los',\n  'fragmentos). Las 4 opciones son candidatos para ese espacio y las cuatro deben encajar',\n  'gramaticalmente en la oración. El espacio va sobre el concepto evaluado (una clase, un atributo, un valor),',\n  'nunca sobre un artículo o una preposición. PROHIBIDO que la respuesta correcta, o una variante evidente,',\n  'ya aparezca escrita en la afirmación.',\n].join('\\n');\n\n// -----------------------------------------------------------------------------\n// buildQuizPrompt: turno de usuario para el modelo. El system prompt fijo vive en\n// prompts/quiz.md. errors = motivos del intento anterior (si se reintenta).\n// -----------------------------------------------------------------------------\nfunction buildQuizPrompt({ title, level, cloze, chunks, recent = [], errors = [] }) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : ''})\\n${String(c.content).slice(0, MAX_CHUNK_CHARS)}`)\n    .join('\\n\\n---\\n\\n');\n  const parts = [\n    `Tema: ${title}`,\n    `Nivel: ${level}. ${DIFFICULTY_GUIDE[level] ?? DIFFICULTY_GUIDE.basico}`,\n    '',\n  ];\n  if (cloze) parts.push(CLOZE_INSTRUCTIONS, '');\n  parts.push('Fragmentos de la documentación:', '', fragmentos, '');\n  if (recent.length) {\n    parts.push('Preguntas recientes de este tema (no repitas ninguna ni preguntes lo mismo con otras palabras):',\n      ...recent.map((q) => `- ${q}`), '');\n  }\n  if (errors.length) {\n    parts.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  }\n  parts.push('Genera UNA pregunta en el JSON indicado.');\n  return parts.join('\\n');\n}\n\n// JSON Schema para response_format de OpenAI (structured outputs, strict).\n// Los mínimos y máximos se validan en validateQuiz, no en el schema.\nconst QUIZ_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['question', 'options', 'correct_index', 'explanation', 'source_fragment'],\n  properties: {\n    question: { type: 'string' },\n    options: { type: 'array', items: { type: 'string' } },\n    correct_index: { type: 'integer' },\n    explanation: { type: 'string' },\n    source_fragment: { type: 'integer' },\n  },\n};\n\nfunction parseQuizJson(text) {\n  try {\n    const s = String(text ?? '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/```$/, '');\n    const o = JSON.parse(s);\n    return o && typeof o === 'object' ? o : null;\n  } catch { return null; }\n}\n\nconst BLANK = '______';\nconst norm = (s) => String(s ?? '').toLowerCase().replace(/[`*_.,;:¿?¡!\"'()]/g, ' ').replace(/\\s+/g, ' ').trim();\n// Opciones que el modelo a veces numera él mismo (\"A) …\"): las letras las pone el código.\nconst stripLabel = (s) => String(s ?? '').trim().replace(/^[A-Da-d][).:-]\\s+/, '');\n\n// Sintaxis de Bootstrap 4: no puede aparecer en ninguna opción de un quiz de 5.3.\nconst V4_IN_OPTION = /\\b(ml|mr|pl|pr)-(\\d|auto)\\b|data-(toggle|target|dismiss)=?|\\bfloat-(left|right)\\b|\\bbadge-pill\\b|\\bform-group\\b|\\bcustom-select\\b|\\bjumbotron\\b/;\n\n// -----------------------------------------------------------------------------\n// validateQuiz: devuelve la pregunta normalizada y la lista de errores (vacía =\n// válida). Cada error está redactado para dárselo al modelo en el reintento.\n// -----------------------------------------------------------------------------\n// lenient (último intento): las reglas de estilo (largo de las opciones) ya no\n// rechazan la pregunta; las de fondo (v4, respuesta regalada, repetidas) sí.\nfunction validateQuiz(raw, { cloze, nFragments, lenient = false }) {\n  const errors = [];\n  if (!raw) return { quiz: null, errors: ['La respuesta no era un JSON válido.'] };\n  const quiz = {\n    question: String(raw.question ?? '').trim().replace(/_{3,}/g, BLANK),\n    options: Array.isArray(raw.options) ? raw.options.map(stripLabel) : [],\n    correct_index: Number(raw.correct_index),\n    explanation: String(raw.explanation ?? '').trim(),\n    source_fragment: Number(raw.source_fragment),\n  };\n  const { question, options, correct_index: ci, explanation } = quiz;\n\n  if (!question || question.length > 400) errors.push('\"question\" vacía o de más de 400 caracteres.');\n  if (!explanation || explanation.length > 800) errors.push('\"explanation\" vacía o de más de 800 caracteres.');\n  if (options.length !== 4) errors.push(`Debe haber exactamente 4 opciones (hubo ${options.length}).`);\n  if (options.some((o) => !o || o.length > 160)) errors.push('Cada opción debe tener texto y menos de 160 caracteres.');\n  if (new Set(options.map(norm)).size !== options.length) errors.push('Hay opciones repetidas.');\n  if (!Number.isInteger(ci) || ci < 0 || ci >= options.length) errors.push('\"correct_index\" fuera de rango.');\n  if (!Number.isInteger(quiz.source_fragment) || quiz.source_fragment < 1 || quiz.source_fragment > nFragments) {\n    errors.push(`\"source_fragment\" debe ser un número de fragmento entre 1 y ${nFragments}.`);\n  }\n  if (options.some((o) => /\\b(todas|ninguna) de las anteriores\\b/i.test(o))) {\n    errors.push('Prohibido \"todas/ninguna de las anteriores\".');\n  }\n\n  // Largo parecido (regla de app-ure): solo cuando las opciones son frases. Con\n  // nombres de clase (`ms-3` frente a `justify-content-center`) o combinaciones\n  // de clases, la proporción no dice nada de cuál es la correcta.\n  const lens = options.map((o) => o.length);\n  const allCode = options.every((o) => /^`[^`]+`$/.test(o));\n  if (!lenient && !allCode && options.length === 4 && Math.min(...lens) >= 25) {\n    if (Math.max(...lens) > Math.min(...lens) * 1.25) {\n      errors.push('La opción más larga supera a la más corta en más del 25 %: empareja los largos.');\n    }\n    if (Number.isInteger(ci) && lens[ci] === Math.max(...lens) && lens.filter((l) => l === lens[ci]).length === 1) {\n      errors.push('La opción correcta no puede ser la más larga del grupo.');\n    }\n  }\n\n  if (cloze) {\n    const blanks = (question.match(/______/g) || []).length;\n    if (blanks !== 1) errors.push(`Formato completar: debe haber exactamente un ______ (hubo ${blanks}).`);\n    const ans = norm(options[ci]);\n    if (ans && norm(question.replace(BLANK, ' ')).includes(ans)) {\n      errors.push('Formato completar: la respuesta correcta ya aparece escrita en la afirmación.');\n    }\n  }\n\n  // Ni como distractor: las incorrectas también tienen que ser material real de 5.3.\n  const v4 = options.filter((o) => V4_IN_OPTION.test(o));\n  if (v4.length) errors.push(`Opciones con sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo clases y atributos de 5.3.`);\n  return { quiz, errors };\n}\n\n// -----------------------------------------------------------------------------\n// shuffleOptions: el código decide dónde queda la correcta. Los modelos tienden\n// a ponerla siempre en la misma posición (a menudo la B), y eso se aprende.\n// rand se inyecta para poder probarlo.\n// -----------------------------------------------------------------------------\nfunction shuffleOptions(quiz, rand = Math.random) {\n  const idx = quiz.options.map((_, i) => i);\n  for (let i = idx.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [idx[i], idx[j]] = [idx[j], idx[i]];\n  }\n  return { ...quiz, options: idx.map((i) => quiz.options[i]), correct_index: idx.indexOf(quiz.correct_index) };\n}\n\n// -----------------------------------------------------------------------------\n// HTML de Telegram. El modelo escribe clases entre `comillas invertidas`; todo\n// lo demás se escapa.\n// -----------------------------------------------------------------------------\nfunction inlineHtml(s) {\n  return String(s ?? '')\n    .split(/(`[^`\\n]+`)/g)\n    .map((p) => {\n      const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n      return /^`[^`\\n]+`$/.test(p) ? `<code>${esc(p.slice(1, -1))}</code>` : esc(p).replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<b>$1</b>');\n    })\n    .join('');\n}\n\nconst LETTERS = ['A', 'B', 'C', 'D'];\nconst LEVEL_LABEL = { basico: 'básico', intermedio: 'intermedio', avanzado: 'avanzado' };\n\n// origin (Fase 5): 'hoy' = pregunta del test de la lección (test_pos de 3),\n// 'repaso' = tema con el repaso vencido; lo demás, quiz normal.\nconst TEST_SIZE = 3;\nfunction quizHeader({ title, level, format, origin, test_pos }) {\n  const t = inlineHtml(title);\n  const head = origin === 'hoy' ? `📝 <b>Test de la lección · ${t}</b> (${test_pos}/${TEST_SIZE})`\n    : origin === 'repaso' ? `🔁 <b>Repaso · ${t}</b>`\n      : `🧠 <b>Quiz · ${t}</b>`;\n  return `${head}\\n<i>Nivel ${LEVEL_LABEL[level] ?? level}${format === 'cloze' ? ' · completa el espacio' : ''}</i>`;\n}\n\n// Mensaje con la pregunta (los botones A-D los agrega el nodo de Telegram).\nfunction formatQuestionMessage({ title, level, format, question, options, origin, test_pos }) {\n  const opts = options.map((o, i) => `<b>${LETTERS[i]})</b> ${inlineHtml(o)}`).join('\\n');\n  return `${quizHeader({ title, level, format, origin, test_pos })}\\n\\n${inlineHtml(question)}\\n\\n${opts}`;\n}\n\n// Mensaje editado después de responder: marca la elegida y la correcta, y\n// agrega la explicación, la fuente (de la metadata, nunca del LLM) y el progreso.\nfunction formatAnsweredMessage({ title, level, format, question, options, origin, test_pos }, r) {\n  const opts = options.map((o, i) => {\n    const mark = i === r.correct_index ? '✅' : i === r.selected_index ? '❌' : '▫️';\n    return `${mark} <b>${LETTERS[i]})</b> ${inlineHtml(o)}`;\n  }).join('\\n');\n  const verdict = r.is_correct ? '<b>¡Correcto!</b>' : `<b>Incorrecto.</b> La respuesta era la ${LETTERS[r.correct_index]}.`;\n  const lines = [quizHeader({ title, level, format, origin, test_pos }), '', inlineHtml(question), '', opts, '',\n    `${verdict} ${inlineHtml(r.explanation)}`, '',\n    `📚 <a href=\"${String(r.source_url).replace(/\"/g, '&quot;')}\">Fuente oficial</a>`];\n  const progress = progressLine(level, r);\n  if (progress) lines.push('', progress);\n  const test = testLine(r.test);\n  if (test) lines.push('', test);\n  return lines.join('\\n');\n}\n\n// Resultado del test de la lección: solo en la respuesta que lo cierra\n// (just_finished), así no se repite si hay doble toque.\nfunction testLine(t) {\n  if (!t || !t.just_finished) return '';\n  if (t.passed) {\n    return `🎉 <b>Test superado</b> (${t.correct}/${t.total}). El tema queda visto` +\n      (t.next_topic ? `; lo siguiente en la ruta es <b>${inlineHtml(t.next_topic)}</b>.` : ' y terminaste la ruta.');\n  }\n  return `📚 <b>Test: ${t.correct}/${t.total}.</b> Necesitas 2 aciertos para pasar de tema: repasa la lección y vuelve a intentarlo.`;\n}\n\n// -----------------------------------------------------------------------------\n// nextButton: el único botón que queda en el mensaje después de responder.\n// Telegram limita callback_data a 64 bytes: h:n:<uuid> ocupa 40.\n// -----------------------------------------------------------------------------\nfunction nextButton(r) {\n  const t = r?.test;\n  if (t && !t.finished) return { text: `Siguiente pregunta (${t.answered + 1}/${t.total}) ➡️`, data: `h:n:${t.test_id}` };\n  if (t && t.just_finished && t.passed) return { text: '📖 Siguiente lección', data: 'n:hoy' };\n  if (t && t.just_finished) return { text: '🔁 Repetir test', data: `h:t:${t.topic_order}` };\n  return { text: 'Otra pregunta ➡️', data: 'n:quiz' };\n}\n\n// Callback \"Siguiente pregunta\" del test: h:n:<uuid> → uuid; si no, null.\nfunction testIdFromCallback(data) {\n  const m = String(data ?? '').match(/^h:n:([0-9a-f-]{36})$/);\n  return m ? m[1] : null;\n}\n\nfunction progressLine(oldLevel, r) {\n  const out = [];\n  if (r.level_changed) {\n    const up = QUIZ_LEVELS.indexOf(r.level) > QUIZ_LEVELS.indexOf(oldLevel);\n    out.push(`${up ? '⬆️ Subes' : '⬇️ Bajas'} a nivel ${LEVEL_LABEL[r.level] ?? r.level} en este tema.`);\n  }\n  if (r.topic_status === 'dominado') out.push('🏆 Tema dominado.');\n  if (r.interval_days) out.push(`🔁 Próximo repaso de este tema: en ${r.interval_days} día${r.interval_days === 1 ? '' : 's'}.`);\n  return out.join('\\n');\n}\n\n// Texto corto del aviso del botón (answerCallbackQuery, máx. 200 caracteres).\nfunction answerToast(r) {\n  switch (r?.status) {\n    case 'ok': return r.is_correct ? '✅ ¡Correcta!' : '❌ Incorrecta';\n    case 'already_answered': return 'Ya respondiste esta pregunta.';\n    default: return 'Esta pregunta ya no está disponible.';\n  }\n}\n\n// -----------------------------------------------------------------------------\n// Deduplicación semántica (corrección de app-ure, que solo comparaba texto\n// exacto). Se embebe la pregunta con gemini-embedding-2 y se compara por coseno\n// con las preguntas recientes del mismo tema.\n//\n// dedupText: qué se embebe. variant 'B' (la que se usa) = la pregunta CON su\n// respuesta correcta: en una de completar el concepto evaluado está justo en el\n// espacio en blanco, y sin la respuesta \"integrity ______\" y \"¿qué atributo…?\"\n// no se parecen. 'A' = solo el enunciado (se conserva para la medición).\n// Prefijo simétrico \"task: sentence similarity\": aquí se comparan preguntas\n// con preguntas, no una consulta con un documento (eso es el asimétrico del RAG).\n// -----------------------------------------------------------------------------\n// Umbral calibrado con 70 pares reales (eval/fase5-dedup.json): con la\n// variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el límite\n// (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que separe:\n// un duplicado quedaba en 0,913 y un par distinto en 0,931.\n// Un falso positivo cuesta un reintento; un falso negativo, una pregunta repetida.\nconst DEDUP_THRESHOLD = 0.935;\n// Contra cuántas preguntas recientes del mismo tema se compara.\nconst DEDUP_RECENT = 20;\n\nfunction dedupText({ question, options, correct_index, format }, variant = 'B') {\n  const clean = (s) => String(s ?? '').replace(/`/g, '').replace(/\\s+/g, ' ').trim();\n  const q = clean(question);\n  const answer = clean(options?.[correct_index]);\n  let text = q;\n  if (variant === 'B') text = format === 'cloze' && q.includes(BLANK) ? q.replace(BLANK, answer) : `${q} Respuesta: ${answer}`;\n  return `task: sentence similarity | query: ${text}`;\n}\n\nfunction cosine(a, b) {\n  let dot = 0, na = 0, nb = 0;\n  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }\n  return na && nb ? dot / Math.sqrt(na * nb) : 0;\n}\n\n// \"/quiz navbar\" → \"navbar\"; \"/quiz css grid\" → \"css-grid\"; \"/quiz\" → null.\nfunction topicHint(text) {\n  const h = String(text ?? '').trim().replace(/^\\/quiz(@\\w+)?/i, '').trim().toLowerCase().replace(/\\s+/g, '-');\n  return h ? h.slice(0, 40) : null;\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  WINDOW_BY_LEVEL, QUIZ_SCHEMA, BLANK,\n  pickWindow, useCloze, buildQuizPrompt, parseQuizJson, validateQuiz, shuffleOptions,\n  inlineHtml, formatQuestionMessage, formatAnsweredMessage, answerToast, topicHint,\n  TEST_SIZE, testLine, nextButton, testIdFromCallback,\n  DEDUP_THRESHOLD, DEDUP_RECENT, dedupText, cosine,\n};\n\n\n// Corre una vez, o de nuevo desde \"¿Reintentar?\" si la validación rechazó la\n// pregunta: entonces $json trae attempt, errors y los tokens gastados.\nconst base = $('Preparar').first().json;\nconst t = $('Elegir tema').first().json;\nconst retry = $json.attempt ? $json : null;\n\nif (!t.topic_key) {\n  const msg = base.hint\n    ? `No encontré el tema \"${base.hint}\". Prueba, por ejemplo, con /quiz navbar, /quiz grid o /quiz buttons.`\n    : 'No encontré un tema para preguntarte ahora. Prueba con /quiz navbar o /quiz grid.';\n  return { json: { ...base, done: true, outcome: 'no_topic', message: msg } };\n}\n// Test ya completo (3 preguntas) o cerrado: un toque viejo de \"Siguiente pregunta\".\nif (base.test_id && (t.test_finished || Number(t.test_asked) >= TEST_SIZE)) {\n  return { json: { ...base, done: true, outcome: 'test_done', message: 'Ese test ya terminó. Escribe /hoy para ver tu lección o /quiz para seguir practicando.' } };\n}\n\nconst level = base.force_level ?? t.level;\nconst seed = Number(t.seed);\nconst cloze = useCloze(Number(t.total));\n// Reintento por pregunta repetida: la ventana siguiente de la página. Con los\n// mismos fragmentos el modelo no tiene otro concepto del que preguntar (medido\n// el 2026-10-05: 5 de 5 reintentos con la misma ventana volvían a repetirse).\nconst window = pickWindow(t.chunks, seed + (retry?.dedup_retry ? 1 : 0), level);\n// origin se guarda en quiz_questions: 'hoy' = test de la lección, 'repaso' = vencido.\nconst origin = t.motivo === 'hoy' ? 'hoy' : t.motivo === 'repaso' ? 'repaso' : 'quiz';\nreturn { json: { ...base, done: false, origin, test_pos: origin === 'hoy' ? Number(t.test_asked) + 1 : null,\n  topic_key: t.topic_key, title: t.title, motivo: t.motivo, level, seed, cloze,\n  window: window.map(({ id, url }) => ({ id, url })),\n  prompt_text: buildQuizPrompt({ title: t.title, level, cloze, chunks: window, recent: t.recent, errors: retry?.errors ?? [] }),\n  attempt: (retry?.attempt ?? 0) + 1,\n  rejected: retry?.rejected ?? [],\n  prompt_tokens: retry?.prompt_tokens ?? 0, completion_tokens: retry?.completion_tokens ?? 0 } };"
+      }
+    },
+    {
+      "id": "g7",
+      "name": "¿Sin tema?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g7-c",
+              "leftValue": "={{ $json.done }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "g8",
+      "name": "Generar pregunta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        -140
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'gpt-4o-mini',\n  messages: [{ role: 'system', content: \"Eres un generador de preguntas de examen sobre **Bootstrap 5.3** para un bot de estudio en\\nTelegram. Escribes en **español**, pero mantienes en inglés los nombres de clases, componentes,\\natributos `data-bs-*` y variables Sass, siempre entre comillas invertidas (`d-flex`).\\n\\nTrabajas EXCLUSIVAMENTE con los fragmentos numerados que recibes: nunca inventes una clase,\\natributo, variable o comportamiento que no aparezca en ellos. Nunca uses sintaxis de Bootstrap 4\\n(`ml-*`, `mr-*`, `data-toggle`, `float-left`, `jumbotron`, etc.).\\n\\nDevuelves un JSON con:\\n- \\\"question\\\": el enunciado en español, directo, como en un examen, redactado con tus palabras (no\\n  copies frases en inglés de los fragmentos). No menciones \\\"los fragmentos\\\", \\\"el texto\\\" ni \\\"la documentación\\\".\\n- \\\"options\\\": exactamente 4 opciones, sin letras ni numeración.\\n- \\\"correct_index\\\": posición (0 a 3) de la correcta.\\n- \\\"explanation\\\": 1 a 3 frases que justifiquen la correcta con lo que dicen los fragmentos y digan\\n  por qué la opción incorrecta más tentadora no sirve. Sin URLs.\\n- \\\"source_fragment\\\": número del fragmento que justifica la respuesta.\\n\\nReglas de las opciones (críticas):\\n1. Las 3 incorrectas se construyen con material REAL de los fragmentos o con clases vecinas que\\n   existen en Bootstrap 5.3 (p. ej. `align-items-center` frente a `justify-content-center`,\\n   `navbar-expand-md` frente a `navbar-expand-lg`). Quien no estudió no debe poder descartarlas.\\n2. Prohibido inventar opciones absurdas, genéricas o ajenas al tema, prohibido \\\"todas las\\n   anteriores\\\" o \\\"ninguna de las anteriores\\\", y prohibida la sintaxis de Bootstrap 4 también en\\n   las incorrectas.\\n3. Las 4 opciones tienen forma gramatical y nivel de detalle parecidos. Si son frases, la más\\n   larga no supera a la más corta en más del 25 % y la correcta NO es la más larga.\\n4. Solo UNA opción es correcta según los fragmentos. Antes de responder, revisa cada incorrecta\\n   contra los fragmentos: si también cumple lo que pide la pregunta (p. ej. preguntas qué componente\\n   requiere Popper y la lista dice que Dropdowns y también Tooltips lo requieren), cámbiala o\\n   haz la pregunta más precisa.\\n\\nLa dificultad viene de CUÁNTAS partes de los fragmentos hay que combinar para responder, nunca de\\nla redacción: el enunciado es claro y directo en cualquier nivel.\" }, { role: 'user', content: $json.prompt_text }],\n  response_format: { type: 'json_schema', json_schema: { name: 'quiz', strict: true, schema: {\n \"type\": \"object\",\n \"additionalProperties\": false,\n \"required\": [\n  \"question\",\n  \"options\",\n  \"correct_index\",\n  \"explanation\",\n  \"source_fragment\"\n ],\n \"properties\": {\n  \"question\": {\n   \"type\": \"string\"\n  },\n  \"options\": {\n   \"type\": \"array\",\n   \"items\": {\n    \"type\": \"string\"\n   }\n  },\n  \"correct_index\": {\n   \"type\": \"integer\"\n  },\n  \"explanation\": {\n   \"type\": \"string\"\n  },\n  \"source_fragment\": {\n   \"type\": \"integer\"\n  }\n }\n} } },\n  max_completion_tokens: 1200\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REEMPLAZAR_OPENAI",
+          "name": "OpenAI account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput",
+      "notes": "System = prompts/quiz.md; usuario = tema, nivel, formato, fragmentos y preguntas recientes (quiz-lib.buildQuizPrompt)."
+    },
+    {
+      "id": "g9",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -140
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// quiz-lib.js — Funciones puras de [BS] Generar quiz y [BS] Responder quiz.\n// Sin dependencias, probadas en local con scripts/test-quiz-lib.js y copiadas a\n// los nodos Code por scripts/build-quiz.js (mismo patrón que rag-lib.js).\n//\n// Regla heredada de app-ure: el código decide y el modelo redacta. El tema, la\n// ventana de fragmentos, el formato (1 de cada 3 es de completar) y la posición\n// de la respuesta correcta los decide este archivo, no el LLM.\n// =============================================================================\n\nconst QUIZ_LEVELS = ['basico', 'intermedio', 'avanzado'];\n\n// Cuántos fragmentos consecutivos ve el modelo según el nivel. La dificultad\n// sale de cuántas partes hay que combinar (regla de app-ure), así que el nivel\n// más alto necesita más material a la vista.\nconst WINDOW_BY_LEVEL = { basico: 2, intermedio: 3, avanzado: 4 };\nconst MAX_CHUNK_CHARS = 3000;\n\n// -----------------------------------------------------------------------------\n// pickWindow: elige fragmentos CONSECUTIVOS de la página del tema. seed = cuántas\n// preguntas de este tema se generaron ya para este chat: cada pregunta nueva cae\n// en la ventana siguiente y la página se recorre entera (en app-ure, ventanas\n// casi iguales hacían salir 3-5 preguntas de la misma página).\n// -----------------------------------------------------------------------------\nfunction pickWindow(chunks, seed, level) {\n  const size = WINDOW_BY_LEVEL[level] ?? 2;\n  if (chunks.length <= size) return chunks.slice();\n  const windows = Math.ceil(chunks.length / size);\n  let start = (seed % windows) * size;\n  // La última ventana puede quedar corta: se corre hacia atrás para que tenga\n  // el mismo tamaño que las demás.\n  start = Math.min(start, chunks.length - size);\n  return chunks.slice(start, start + size);\n}\n\n// -----------------------------------------------------------------------------\n// useCloze: 1 de cada 3 preguntas es de completar el espacio. Se usa un hash del\n// seed y no seed % 3, porque seed también elige la ventana (seed % ventanas):\n// con 3, 6 o 9 ventanas, los dos ciclos quedarían sincronizados y siempre las\n// mismas partes de la página saldrían como \"completar\" (lección de app-ure).\n// -----------------------------------------------------------------------------\nfunction useCloze(seed) {\n  let x = seed | 0;\n  x = Math.imul(x ^ (x >>> 16), 2246822507);\n  x = Math.imul(x ^ (x >>> 13), 3266489909);\n  return ((x ^ (x >>> 16)) >>> 0) % 3 === 0;\n}\n\nconst DIFFICULTY_GUIDE = {\n  basico:\n    'Básico: la respuesta correcta se puede señalar con UNA sola frase o un solo ejemplo de los fragmentos ' +\n    '(qué clase hace X, qué atributo activa Y). No pidas relacionar dos ideas distintas.',\n  intermedio:\n    'Intermedio: la pregunta obliga a conectar EXACTAMENTE dos ideas de los fragmentos (combinar dos clases, ' +\n    'aplicar una regla a un caso concreto, elegir la clase según el breakpoint). Si se responde con una sola ' +\n    'frase aislada, está mal clasificada.',\n  avanzado:\n    'Avanzado: la pregunta exige combinar al menos TRES ideas de fragmentos distintos o deducir una consecuencia ' +\n    'que los fragmentos no dicen literalmente (qué pasa si se omite un paso, qué combinación logra un resultado). ' +\n    'Si se responde con una sola frase, está mal clasificada.',\n};\n\nconst CLOZE_INSTRUCTIONS = [\n  'FORMATO DE ESTA PREGUNTA: completar el espacio en blanco.',\n  '\"question\" es una AFIRMACIÓN (sin signo de interrogación) con exactamente UN espacio escrito como ______',\n  '(seis guiones bajos), redactada en español con tus palabras (no copies una frase en inglés de los',\n  'fragmentos). Las 4 opciones son candidatos para ese espacio y las cuatro deben encajar',\n  'gramaticalmente en la oración. El espacio va sobre el concepto evaluado (una clase, un atributo, un valor),',\n  'nunca sobre un artículo o una preposición. PROHIBIDO que la respuesta correcta, o una variante evidente,',\n  'ya aparezca escrita en la afirmación.',\n].join('\\n');\n\n// -----------------------------------------------------------------------------\n// buildQuizPrompt: turno de usuario para el modelo. El system prompt fijo vive en\n// prompts/quiz.md. errors = motivos del intento anterior (si se reintenta).\n// -----------------------------------------------------------------------------\nfunction buildQuizPrompt({ title, level, cloze, chunks, recent = [], errors = [] }) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : ''})\\n${String(c.content).slice(0, MAX_CHUNK_CHARS)}`)\n    .join('\\n\\n---\\n\\n');\n  const parts = [\n    `Tema: ${title}`,\n    `Nivel: ${level}. ${DIFFICULTY_GUIDE[level] ?? DIFFICULTY_GUIDE.basico}`,\n    '',\n  ];\n  if (cloze) parts.push(CLOZE_INSTRUCTIONS, '');\n  parts.push('Fragmentos de la documentación:', '', fragmentos, '');\n  if (recent.length) {\n    parts.push('Preguntas recientes de este tema (no repitas ninguna ni preguntes lo mismo con otras palabras):',\n      ...recent.map((q) => `- ${q}`), '');\n  }\n  if (errors.length) {\n    parts.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  }\n  parts.push('Genera UNA pregunta en el JSON indicado.');\n  return parts.join('\\n');\n}\n\n// JSON Schema para response_format de OpenAI (structured outputs, strict).\n// Los mínimos y máximos se validan en validateQuiz, no en el schema.\nconst QUIZ_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['question', 'options', 'correct_index', 'explanation', 'source_fragment'],\n  properties: {\n    question: { type: 'string' },\n    options: { type: 'array', items: { type: 'string' } },\n    correct_index: { type: 'integer' },\n    explanation: { type: 'string' },\n    source_fragment: { type: 'integer' },\n  },\n};\n\nfunction parseQuizJson(text) {\n  try {\n    const s = String(text ?? '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/```$/, '');\n    const o = JSON.parse(s);\n    return o && typeof o === 'object' ? o : null;\n  } catch { return null; }\n}\n\nconst BLANK = '______';\nconst norm = (s) => String(s ?? '').toLowerCase().replace(/[`*_.,;:¿?¡!\"'()]/g, ' ').replace(/\\s+/g, ' ').trim();\n// Opciones que el modelo a veces numera él mismo (\"A) …\"): las letras las pone el código.\nconst stripLabel = (s) => String(s ?? '').trim().replace(/^[A-Da-d][).:-]\\s+/, '');\n\n// Sintaxis de Bootstrap 4: no puede aparecer en ninguna opción de un quiz de 5.3.\nconst V4_IN_OPTION = /\\b(ml|mr|pl|pr)-(\\d|auto)\\b|data-(toggle|target|dismiss)=?|\\bfloat-(left|right)\\b|\\bbadge-pill\\b|\\bform-group\\b|\\bcustom-select\\b|\\bjumbotron\\b/;\n\n// -----------------------------------------------------------------------------\n// validateQuiz: devuelve la pregunta normalizada y la lista de errores (vacía =\n// válida). Cada error está redactado para dárselo al modelo en el reintento.\n// -----------------------------------------------------------------------------\n// lenient (último intento): las reglas de estilo (largo de las opciones) ya no\n// rechazan la pregunta; las de fondo (v4, respuesta regalada, repetidas) sí.\nfunction validateQuiz(raw, { cloze, nFragments, lenient = false }) {\n  const errors = [];\n  if (!raw) return { quiz: null, errors: ['La respuesta no era un JSON válido.'] };\n  const quiz = {\n    question: String(raw.question ?? '').trim().replace(/_{3,}/g, BLANK),\n    options: Array.isArray(raw.options) ? raw.options.map(stripLabel) : [],\n    correct_index: Number(raw.correct_index),\n    explanation: String(raw.explanation ?? '').trim(),\n    source_fragment: Number(raw.source_fragment),\n  };\n  const { question, options, correct_index: ci, explanation } = quiz;\n\n  if (!question || question.length > 400) errors.push('\"question\" vacía o de más de 400 caracteres.');\n  if (!explanation || explanation.length > 800) errors.push('\"explanation\" vacía o de más de 800 caracteres.');\n  if (options.length !== 4) errors.push(`Debe haber exactamente 4 opciones (hubo ${options.length}).`);\n  if (options.some((o) => !o || o.length > 160)) errors.push('Cada opción debe tener texto y menos de 160 caracteres.');\n  if (new Set(options.map(norm)).size !== options.length) errors.push('Hay opciones repetidas.');\n  if (!Number.isInteger(ci) || ci < 0 || ci >= options.length) errors.push('\"correct_index\" fuera de rango.');\n  if (!Number.isInteger(quiz.source_fragment) || quiz.source_fragment < 1 || quiz.source_fragment > nFragments) {\n    errors.push(`\"source_fragment\" debe ser un número de fragmento entre 1 y ${nFragments}.`);\n  }\n  if (options.some((o) => /\\b(todas|ninguna) de las anteriores\\b/i.test(o))) {\n    errors.push('Prohibido \"todas/ninguna de las anteriores\".');\n  }\n\n  // Largo parecido (regla de app-ure): solo cuando las opciones son frases. Con\n  // nombres de clase (`ms-3` frente a `justify-content-center`) o combinaciones\n  // de clases, la proporción no dice nada de cuál es la correcta.\n  const lens = options.map((o) => o.length);\n  const allCode = options.every((o) => /^`[^`]+`$/.test(o));\n  if (!lenient && !allCode && options.length === 4 && Math.min(...lens) >= 25) {\n    if (Math.max(...lens) > Math.min(...lens) * 1.25) {\n      errors.push('La opción más larga supera a la más corta en más del 25 %: empareja los largos.');\n    }\n    if (Number.isInteger(ci) && lens[ci] === Math.max(...lens) && lens.filter((l) => l === lens[ci]).length === 1) {\n      errors.push('La opción correcta no puede ser la más larga del grupo.');\n    }\n  }\n\n  if (cloze) {\n    const blanks = (question.match(/______/g) || []).length;\n    if (blanks !== 1) errors.push(`Formato completar: debe haber exactamente un ______ (hubo ${blanks}).`);\n    const ans = norm(options[ci]);\n    if (ans && norm(question.replace(BLANK, ' ')).includes(ans)) {\n      errors.push('Formato completar: la respuesta correcta ya aparece escrita en la afirmación.');\n    }\n  }\n\n  // Ni como distractor: las incorrectas también tienen que ser material real de 5.3.\n  const v4 = options.filter((o) => V4_IN_OPTION.test(o));\n  if (v4.length) errors.push(`Opciones con sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo clases y atributos de 5.3.`);\n  return { quiz, errors };\n}\n\n// -----------------------------------------------------------------------------\n// shuffleOptions: el código decide dónde queda la correcta. Los modelos tienden\n// a ponerla siempre en la misma posición (a menudo la B), y eso se aprende.\n// rand se inyecta para poder probarlo.\n// -----------------------------------------------------------------------------\nfunction shuffleOptions(quiz, rand = Math.random) {\n  const idx = quiz.options.map((_, i) => i);\n  for (let i = idx.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [idx[i], idx[j]] = [idx[j], idx[i]];\n  }\n  return { ...quiz, options: idx.map((i) => quiz.options[i]), correct_index: idx.indexOf(quiz.correct_index) };\n}\n\n// -----------------------------------------------------------------------------\n// HTML de Telegram. El modelo escribe clases entre `comillas invertidas`; todo\n// lo demás se escapa.\n// -----------------------------------------------------------------------------\nfunction inlineHtml(s) {\n  return String(s ?? '')\n    .split(/(`[^`\\n]+`)/g)\n    .map((p) => {\n      const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n      return /^`[^`\\n]+`$/.test(p) ? `<code>${esc(p.slice(1, -1))}</code>` : esc(p).replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<b>$1</b>');\n    })\n    .join('');\n}\n\nconst LETTERS = ['A', 'B', 'C', 'D'];\nconst LEVEL_LABEL = { basico: 'básico', intermedio: 'intermedio', avanzado: 'avanzado' };\n\n// origin (Fase 5): 'hoy' = pregunta del test de la lección (test_pos de 3),\n// 'repaso' = tema con el repaso vencido; lo demás, quiz normal.\nconst TEST_SIZE = 3;\nfunction quizHeader({ title, level, format, origin, test_pos }) {\n  const t = inlineHtml(title);\n  const head = origin === 'hoy' ? `📝 <b>Test de la lección · ${t}</b> (${test_pos}/${TEST_SIZE})`\n    : origin === 'repaso' ? `🔁 <b>Repaso · ${t}</b>`\n      : `🧠 <b>Quiz · ${t}</b>`;\n  return `${head}\\n<i>Nivel ${LEVEL_LABEL[level] ?? level}${format === 'cloze' ? ' · completa el espacio' : ''}</i>`;\n}\n\n// Mensaje con la pregunta (los botones A-D los agrega el nodo de Telegram).\nfunction formatQuestionMessage({ title, level, format, question, options, origin, test_pos }) {\n  const opts = options.map((o, i) => `<b>${LETTERS[i]})</b> ${inlineHtml(o)}`).join('\\n');\n  return `${quizHeader({ title, level, format, origin, test_pos })}\\n\\n${inlineHtml(question)}\\n\\n${opts}`;\n}\n\n// Mensaje editado después de responder: marca la elegida y la correcta, y\n// agrega la explicación, la fuente (de la metadata, nunca del LLM) y el progreso.\nfunction formatAnsweredMessage({ title, level, format, question, options, origin, test_pos }, r) {\n  const opts = options.map((o, i) => {\n    const mark = i === r.correct_index ? '✅' : i === r.selected_index ? '❌' : '▫️';\n    return `${mark} <b>${LETTERS[i]})</b> ${inlineHtml(o)}`;\n  }).join('\\n');\n  const verdict = r.is_correct ? '<b>¡Correcto!</b>' : `<b>Incorrecto.</b> La respuesta era la ${LETTERS[r.correct_index]}.`;\n  const lines = [quizHeader({ title, level, format, origin, test_pos }), '', inlineHtml(question), '', opts, '',\n    `${verdict} ${inlineHtml(r.explanation)}`, '',\n    `📚 <a href=\"${String(r.source_url).replace(/\"/g, '&quot;')}\">Fuente oficial</a>`];\n  const progress = progressLine(level, r);\n  if (progress) lines.push('', progress);\n  const test = testLine(r.test);\n  if (test) lines.push('', test);\n  return lines.join('\\n');\n}\n\n// Resultado del test de la lección: solo en la respuesta que lo cierra\n// (just_finished), así no se repite si hay doble toque.\nfunction testLine(t) {\n  if (!t || !t.just_finished) return '';\n  if (t.passed) {\n    return `🎉 <b>Test superado</b> (${t.correct}/${t.total}). El tema queda visto` +\n      (t.next_topic ? `; lo siguiente en la ruta es <b>${inlineHtml(t.next_topic)}</b>.` : ' y terminaste la ruta.');\n  }\n  return `📚 <b>Test: ${t.correct}/${t.total}.</b> Necesitas 2 aciertos para pasar de tema: repasa la lección y vuelve a intentarlo.`;\n}\n\n// -----------------------------------------------------------------------------\n// nextButton: el único botón que queda en el mensaje después de responder.\n// Telegram limita callback_data a 64 bytes: h:n:<uuid> ocupa 40.\n// -----------------------------------------------------------------------------\nfunction nextButton(r) {\n  const t = r?.test;\n  if (t && !t.finished) return { text: `Siguiente pregunta (${t.answered + 1}/${t.total}) ➡️`, data: `h:n:${t.test_id}` };\n  if (t && t.just_finished && t.passed) return { text: '📖 Siguiente lección', data: 'n:hoy' };\n  if (t && t.just_finished) return { text: '🔁 Repetir test', data: `h:t:${t.topic_order}` };\n  return { text: 'Otra pregunta ➡️', data: 'n:quiz' };\n}\n\n// Callback \"Siguiente pregunta\" del test: h:n:<uuid> → uuid; si no, null.\nfunction testIdFromCallback(data) {\n  const m = String(data ?? '').match(/^h:n:([0-9a-f-]{36})$/);\n  return m ? m[1] : null;\n}\n\nfunction progressLine(oldLevel, r) {\n  const out = [];\n  if (r.level_changed) {\n    const up = QUIZ_LEVELS.indexOf(r.level) > QUIZ_LEVELS.indexOf(oldLevel);\n    out.push(`${up ? '⬆️ Subes' : '⬇️ Bajas'} a nivel ${LEVEL_LABEL[r.level] ?? r.level} en este tema.`);\n  }\n  if (r.topic_status === 'dominado') out.push('🏆 Tema dominado.');\n  if (r.interval_days) out.push(`🔁 Próximo repaso de este tema: en ${r.interval_days} día${r.interval_days === 1 ? '' : 's'}.`);\n  return out.join('\\n');\n}\n\n// Texto corto del aviso del botón (answerCallbackQuery, máx. 200 caracteres).\nfunction answerToast(r) {\n  switch (r?.status) {\n    case 'ok': return r.is_correct ? '✅ ¡Correcta!' : '❌ Incorrecta';\n    case 'already_answered': return 'Ya respondiste esta pregunta.';\n    default: return 'Esta pregunta ya no está disponible.';\n  }\n}\n\n// -----------------------------------------------------------------------------\n// Deduplicación semántica (corrección de app-ure, que solo comparaba texto\n// exacto). Se embebe la pregunta con gemini-embedding-2 y se compara por coseno\n// con las preguntas recientes del mismo tema.\n//\n// dedupText: qué se embebe. variant 'B' (la que se usa) = la pregunta CON su\n// respuesta correcta: en una de completar el concepto evaluado está justo en el\n// espacio en blanco, y sin la respuesta \"integrity ______\" y \"¿qué atributo…?\"\n// no se parecen. 'A' = solo el enunciado (se conserva para la medición).\n// Prefijo simétrico \"task: sentence similarity\": aquí se comparan preguntas\n// con preguntas, no una consulta con un documento (eso es el asimétrico del RAG).\n// -----------------------------------------------------------------------------\n// Umbral calibrado con 70 pares reales (eval/fase5-dedup.json): con la\n// variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el límite\n// (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que separe:\n// un duplicado quedaba en 0,913 y un par distinto en 0,931.\n// Un falso positivo cuesta un reintento; un falso negativo, una pregunta repetida.\nconst DEDUP_THRESHOLD = 0.935;\n// Contra cuántas preguntas recientes del mismo tema se compara.\nconst DEDUP_RECENT = 20;\n\nfunction dedupText({ question, options, correct_index, format }, variant = 'B') {\n  const clean = (s) => String(s ?? '').replace(/`/g, '').replace(/\\s+/g, ' ').trim();\n  const q = clean(question);\n  const answer = clean(options?.[correct_index]);\n  let text = q;\n  if (variant === 'B') text = format === 'cloze' && q.includes(BLANK) ? q.replace(BLANK, answer) : `${q} Respuesta: ${answer}`;\n  return `task: sentence similarity | query: ${text}`;\n}\n\nfunction cosine(a, b) {\n  let dot = 0, na = 0, nb = 0;\n  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }\n  return na && nb ? dot / Math.sqrt(na * nb) : 0;\n}\n\n// \"/quiz navbar\" → \"navbar\"; \"/quiz css grid\" → \"css-grid\"; \"/quiz\" → null.\nfunction topicHint(text) {\n  const h = String(text ?? '').trim().replace(/^\\/quiz(@\\w+)?/i, '').trim().toLowerCase().replace(/\\s+/g, '-');\n  return h ? h.slice(0, 40) : null;\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  WINDOW_BY_LEVEL, QUIZ_SCHEMA, BLANK,\n  pickWindow, useCloze, buildQuizPrompt, parseQuizJson, validateQuiz, shuffleOptions,\n  inlineHtml, formatQuestionMessage, formatAnsweredMessage, answerToast, topicHint,\n  TEST_SIZE, testLine, nextButton, testIdFromCallback,\n  DEDUP_THRESHOLD, DEDUP_RECENT, dedupText, cosine,\n};\n\n\n// $('Armar prompt').item sigue el item de ESTA vuelta (paired items).\nconst p = $('Armar prompt').item.json;\nconst text = $json.choices?.[0]?.message?.content ?? '';\nconst tokens = { prompt_tokens: p.prompt_tokens + ($json.usage?.prompt_tokens ?? 0),\n                 completion_tokens: p.completion_tokens + ($json.usage?.completion_tokens ?? 0) };\nconst { quiz, errors } = validateQuiz(parseQuizJson(text), { cloze: p.cloze, nFragments: p.window.length, lenient: p.attempt >= 2 });\nconst { prompt_text, ...state } = p;\n\nif (errors.length) {\n  const rejected = [...p.rejected, errors];\n  // Un solo reintento, con los motivos para que el modelo los corrija.\n  if (p.attempt < 2) return { json: { ...state, ...tokens, retry: true, errors, rejected } };\n  return { json: { ...state, ...tokens, retry: false, rejected, outcome: 'error',\n    message: 'No pude armar una buena pregunta esta vez. Escribe /quiz para intentarlo de nuevo.' } };\n}\n\nconst s = shuffleOptions(quiz);\nconst format = p.cloze ? 'cloze' : 'multiple';\nreturn { json: { ...state, ...tokens, retry: false, outcome: 'ok', model: 'gpt-4o-mini',\n  format, question: s.question, options: s.options, correct_index: s.correct_index, explanation: s.explanation,\n  // La fuente sale de la metadata del fragmento elegido, nunca del texto del modelo.\n  source_url: p.window[s.source_fragment - 1].url,\n  chunk_ids: p.window.map((c) => c.id),\n  dedup_text: dedupText({ question: s.question, options: s.options, correct_index: s.correct_index, format }),\n  html: formatQuestionMessage({ title: p.title, level: p.level, format, question: s.question, options: s.options,\n    origin: p.origin, test_pos: p.test_pos }) } };"
+      },
+      "notes": "Valida el contenido (4 opciones distintas, 125 %, completar, v4, fragmento citado), baraja las opciones y arma el HTML."
+    },
+    {
+      "id": "g10",
+      "name": "¿Reintentar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1980,
+        -140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g10-c",
+              "leftValue": "={{ $json.retry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Un solo reintento; si la segunda versión también falla, se avisa al usuario y no se guarda nada."
+    },
+    {
+      "id": "g10b",
+      "name": "¿Válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2090,
+        -280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g10b-c",
+              "leftValue": "={{ $json.outcome }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "g10c",
+      "name": "Embeber pregunta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2200,
+        -420
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: { parts: [{ text: $json.dedup_text }] }, outputDimensionality: 1536 }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_GEMINI",
+          "name": "BS Gemini"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "notes": "Deduplicación semántica: pregunta + respuesta correcta (quiz-lib.dedupText). Si Gemini falla, la pregunta se acepta sin comparar."
+    },
+    {
+      "id": "g10d",
+      "name": "Buscar parecida",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2310,
+        -420
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- quiz/06_parecida.sql — [BS] Generar quiz, nodo \"Buscar parecida\"\n--\n-- Deduplicación semántica: la pregunta recién generada contra las últimas\n-- 20 preguntas del mismo chat y tema de las últimas 24 h con embedding. Devuelve la\n-- más parecida y su similitud coseno (1 - distancia <=> de pgvector).\n-- Devuelve SIEMPRE una fila: sim NULL = no hay con qué comparar o no hubo\n-- embedding (Gemini falló); en ese caso la pregunta se acepta igual.\n-- =============================================================================\n\nWITH p AS (\n  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, topic_key text, emb text)\n)\nSELECT b.question AS similar_question, b.sim\n  FROM p\n  LEFT JOIN LATERAL (\n    SELECT r.question, 1 - (r.question_embedding <=> p.emb::vector) AS sim\n      FROM (SELECT q.question, q.question_embedding\n              FROM quiz_questions q\n             WHERE q.chat_id = p.chat_id AND q.topic_key = p.topic_key AND q.question_embedding IS NOT NULL\n               -- Solo el último día: repetir un concepto en la misma sesión o test molesta;\n               -- volver a él días después es el repaso espaciado. Además, un tema corto se\n               -- \"agota\" (Gutters tiene ~6 conceptos) y comparar contra todo su historial\n               -- haría reintentar casi siempre, pagando dos llamadas al LLM por pregunta.\n               AND q.created_at > now() - interval '24 hours'\n             ORDER BY q.created_at DESC\n             LIMIT 20) r\n     ORDER BY sim DESC\n     LIMIT 1\n  ) b ON p.emb IS NOT NULL;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $('Validar').item.json.chat_id, topic_key: $('Validar').item.json.topic_key, emb: $json.embedding?.values ? '[' + $json.embedding.values.join(',') + ']' : null }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "La más parecida entre las últimas 20 preguntas del tema (coseno con pgvector)."
+    },
+    {
+      "id": "g10e",
+      "name": "Decidir dedup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -420
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// quiz-lib.js — Funciones puras de [BS] Generar quiz y [BS] Responder quiz.\n// Sin dependencias, probadas en local con scripts/test-quiz-lib.js y copiadas a\n// los nodos Code por scripts/build-quiz.js (mismo patrón que rag-lib.js).\n//\n// Regla heredada de app-ure: el código decide y el modelo redacta. El tema, la\n// ventana de fragmentos, el formato (1 de cada 3 es de completar) y la posición\n// de la respuesta correcta los decide este archivo, no el LLM.\n// =============================================================================\n\nconst QUIZ_LEVELS = ['basico', 'intermedio', 'avanzado'];\n\n// Cuántos fragmentos consecutivos ve el modelo según el nivel. La dificultad\n// sale de cuántas partes hay que combinar (regla de app-ure), así que el nivel\n// más alto necesita más material a la vista.\nconst WINDOW_BY_LEVEL = { basico: 2, intermedio: 3, avanzado: 4 };\nconst MAX_CHUNK_CHARS = 3000;\n\n// -----------------------------------------------------------------------------\n// pickWindow: elige fragmentos CONSECUTIVOS de la página del tema. seed = cuántas\n// preguntas de este tema se generaron ya para este chat: cada pregunta nueva cae\n// en la ventana siguiente y la página se recorre entera (en app-ure, ventanas\n// casi iguales hacían salir 3-5 preguntas de la misma página).\n// -----------------------------------------------------------------------------\nfunction pickWindow(chunks, seed, level) {\n  const size = WINDOW_BY_LEVEL[level] ?? 2;\n  if (chunks.length <= size) return chunks.slice();\n  const windows = Math.ceil(chunks.length / size);\n  let start = (seed % windows) * size;\n  // La última ventana puede quedar corta: se corre hacia atrás para que tenga\n  // el mismo tamaño que las demás.\n  start = Math.min(start, chunks.length - size);\n  return chunks.slice(start, start + size);\n}\n\n// -----------------------------------------------------------------------------\n// useCloze: 1 de cada 3 preguntas es de completar el espacio. Se usa un hash del\n// seed y no seed % 3, porque seed también elige la ventana (seed % ventanas):\n// con 3, 6 o 9 ventanas, los dos ciclos quedarían sincronizados y siempre las\n// mismas partes de la página saldrían como \"completar\" (lección de app-ure).\n// -----------------------------------------------------------------------------\nfunction useCloze(seed) {\n  let x = seed | 0;\n  x = Math.imul(x ^ (x >>> 16), 2246822507);\n  x = Math.imul(x ^ (x >>> 13), 3266489909);\n  return ((x ^ (x >>> 16)) >>> 0) % 3 === 0;\n}\n\nconst DIFFICULTY_GUIDE = {\n  basico:\n    'Básico: la respuesta correcta se puede señalar con UNA sola frase o un solo ejemplo de los fragmentos ' +\n    '(qué clase hace X, qué atributo activa Y). No pidas relacionar dos ideas distintas.',\n  intermedio:\n    'Intermedio: la pregunta obliga a conectar EXACTAMENTE dos ideas de los fragmentos (combinar dos clases, ' +\n    'aplicar una regla a un caso concreto, elegir la clase según el breakpoint). Si se responde con una sola ' +\n    'frase aislada, está mal clasificada.',\n  avanzado:\n    'Avanzado: la pregunta exige combinar al menos TRES ideas de fragmentos distintos o deducir una consecuencia ' +\n    'que los fragmentos no dicen literalmente (qué pasa si se omite un paso, qué combinación logra un resultado). ' +\n    'Si se responde con una sola frase, está mal clasificada.',\n};\n\nconst CLOZE_INSTRUCTIONS = [\n  'FORMATO DE ESTA PREGUNTA: completar el espacio en blanco.',\n  '\"question\" es una AFIRMACIÓN (sin signo de interrogación) con exactamente UN espacio escrito como ______',\n  '(seis guiones bajos), redactada en español con tus palabras (no copies una frase en inglés de los',\n  'fragmentos). Las 4 opciones son candidatos para ese espacio y las cuatro deben encajar',\n  'gramaticalmente en la oración. El espacio va sobre el concepto evaluado (una clase, un atributo, un valor),',\n  'nunca sobre un artículo o una preposición. PROHIBIDO que la respuesta correcta, o una variante evidente,',\n  'ya aparezca escrita en la afirmación.',\n].join('\\n');\n\n// -----------------------------------------------------------------------------\n// buildQuizPrompt: turno de usuario para el modelo. El system prompt fijo vive en\n// prompts/quiz.md. errors = motivos del intento anterior (si se reintenta).\n// -----------------------------------------------------------------------------\nfunction buildQuizPrompt({ title, level, cloze, chunks, recent = [], errors = [] }) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : ''})\\n${String(c.content).slice(0, MAX_CHUNK_CHARS)}`)\n    .join('\\n\\n---\\n\\n');\n  const parts = [\n    `Tema: ${title}`,\n    `Nivel: ${level}. ${DIFFICULTY_GUIDE[level] ?? DIFFICULTY_GUIDE.basico}`,\n    '',\n  ];\n  if (cloze) parts.push(CLOZE_INSTRUCTIONS, '');\n  parts.push('Fragmentos de la documentación:', '', fragmentos, '');\n  if (recent.length) {\n    parts.push('Preguntas recientes de este tema (no repitas ninguna ni preguntes lo mismo con otras palabras):',\n      ...recent.map((q) => `- ${q}`), '');\n  }\n  if (errors.length) {\n    parts.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  }\n  parts.push('Genera UNA pregunta en el JSON indicado.');\n  return parts.join('\\n');\n}\n\n// JSON Schema para response_format de OpenAI (structured outputs, strict).\n// Los mínimos y máximos se validan en validateQuiz, no en el schema.\nconst QUIZ_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['question', 'options', 'correct_index', 'explanation', 'source_fragment'],\n  properties: {\n    question: { type: 'string' },\n    options: { type: 'array', items: { type: 'string' } },\n    correct_index: { type: 'integer' },\n    explanation: { type: 'string' },\n    source_fragment: { type: 'integer' },\n  },\n};\n\nfunction parseQuizJson(text) {\n  try {\n    const s = String(text ?? '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/```$/, '');\n    const o = JSON.parse(s);\n    return o && typeof o === 'object' ? o : null;\n  } catch { return null; }\n}\n\nconst BLANK = '______';\nconst norm = (s) => String(s ?? '').toLowerCase().replace(/[`*_.,;:¿?¡!\"'()]/g, ' ').replace(/\\s+/g, ' ').trim();\n// Opciones que el modelo a veces numera él mismo (\"A) …\"): las letras las pone el código.\nconst stripLabel = (s) => String(s ?? '').trim().replace(/^[A-Da-d][).:-]\\s+/, '');\n\n// Sintaxis de Bootstrap 4: no puede aparecer en ninguna opción de un quiz de 5.3.\nconst V4_IN_OPTION = /\\b(ml|mr|pl|pr)-(\\d|auto)\\b|data-(toggle|target|dismiss)=?|\\bfloat-(left|right)\\b|\\bbadge-pill\\b|\\bform-group\\b|\\bcustom-select\\b|\\bjumbotron\\b/;\n\n// -----------------------------------------------------------------------------\n// validateQuiz: devuelve la pregunta normalizada y la lista de errores (vacía =\n// válida). Cada error está redactado para dárselo al modelo en el reintento.\n// -----------------------------------------------------------------------------\n// lenient (último intento): las reglas de estilo (largo de las opciones) ya no\n// rechazan la pregunta; las de fondo (v4, respuesta regalada, repetidas) sí.\nfunction validateQuiz(raw, { cloze, nFragments, lenient = false }) {\n  const errors = [];\n  if (!raw) return { quiz: null, errors: ['La respuesta no era un JSON válido.'] };\n  const quiz = {\n    question: String(raw.question ?? '').trim().replace(/_{3,}/g, BLANK),\n    options: Array.isArray(raw.options) ? raw.options.map(stripLabel) : [],\n    correct_index: Number(raw.correct_index),\n    explanation: String(raw.explanation ?? '').trim(),\n    source_fragment: Number(raw.source_fragment),\n  };\n  const { question, options, correct_index: ci, explanation } = quiz;\n\n  if (!question || question.length > 400) errors.push('\"question\" vacía o de más de 400 caracteres.');\n  if (!explanation || explanation.length > 800) errors.push('\"explanation\" vacía o de más de 800 caracteres.');\n  if (options.length !== 4) errors.push(`Debe haber exactamente 4 opciones (hubo ${options.length}).`);\n  if (options.some((o) => !o || o.length > 160)) errors.push('Cada opción debe tener texto y menos de 160 caracteres.');\n  if (new Set(options.map(norm)).size !== options.length) errors.push('Hay opciones repetidas.');\n  if (!Number.isInteger(ci) || ci < 0 || ci >= options.length) errors.push('\"correct_index\" fuera de rango.');\n  if (!Number.isInteger(quiz.source_fragment) || quiz.source_fragment < 1 || quiz.source_fragment > nFragments) {\n    errors.push(`\"source_fragment\" debe ser un número de fragmento entre 1 y ${nFragments}.`);\n  }\n  if (options.some((o) => /\\b(todas|ninguna) de las anteriores\\b/i.test(o))) {\n    errors.push('Prohibido \"todas/ninguna de las anteriores\".');\n  }\n\n  // Largo parecido (regla de app-ure): solo cuando las opciones son frases. Con\n  // nombres de clase (`ms-3` frente a `justify-content-center`) o combinaciones\n  // de clases, la proporción no dice nada de cuál es la correcta.\n  const lens = options.map((o) => o.length);\n  const allCode = options.every((o) => /^`[^`]+`$/.test(o));\n  if (!lenient && !allCode && options.length === 4 && Math.min(...lens) >= 25) {\n    if (Math.max(...lens) > Math.min(...lens) * 1.25) {\n      errors.push('La opción más larga supera a la más corta en más del 25 %: empareja los largos.');\n    }\n    if (Number.isInteger(ci) && lens[ci] === Math.max(...lens) && lens.filter((l) => l === lens[ci]).length === 1) {\n      errors.push('La opción correcta no puede ser la más larga del grupo.');\n    }\n  }\n\n  if (cloze) {\n    const blanks = (question.match(/______/g) || []).length;\n    if (blanks !== 1) errors.push(`Formato completar: debe haber exactamente un ______ (hubo ${blanks}).`);\n    const ans = norm(options[ci]);\n    if (ans && norm(question.replace(BLANK, ' ')).includes(ans)) {\n      errors.push('Formato completar: la respuesta correcta ya aparece escrita en la afirmación.');\n    }\n  }\n\n  // Ni como distractor: las incorrectas también tienen que ser material real de 5.3.\n  const v4 = options.filter((o) => V4_IN_OPTION.test(o));\n  if (v4.length) errors.push(`Opciones con sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo clases y atributos de 5.3.`);\n  return { quiz, errors };\n}\n\n// -----------------------------------------------------------------------------\n// shuffleOptions: el código decide dónde queda la correcta. Los modelos tienden\n// a ponerla siempre en la misma posición (a menudo la B), y eso se aprende.\n// rand se inyecta para poder probarlo.\n// -----------------------------------------------------------------------------\nfunction shuffleOptions(quiz, rand = Math.random) {\n  const idx = quiz.options.map((_, i) => i);\n  for (let i = idx.length - 1; i > 0; i--) {\n    const j = Math.floor(rand() * (i + 1));\n    [idx[i], idx[j]] = [idx[j], idx[i]];\n  }\n  return { ...quiz, options: idx.map((i) => quiz.options[i]), correct_index: idx.indexOf(quiz.correct_index) };\n}\n\n// -----------------------------------------------------------------------------\n// HTML de Telegram. El modelo escribe clases entre `comillas invertidas`; todo\n// lo demás se escapa.\n// -----------------------------------------------------------------------------\nfunction inlineHtml(s) {\n  return String(s ?? '')\n    .split(/(`[^`\\n]+`)/g)\n    .map((p) => {\n      const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n      return /^`[^`\\n]+`$/.test(p) ? `<code>${esc(p.slice(1, -1))}</code>` : esc(p).replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<b>$1</b>');\n    })\n    .join('');\n}\n\nconst LETTERS = ['A', 'B', 'C', 'D'];\nconst LEVEL_LABEL = { basico: 'básico', intermedio: 'intermedio', avanzado: 'avanzado' };\n\n// origin (Fase 5): 'hoy' = pregunta del test de la lección (test_pos de 3),\n// 'repaso' = tema con el repaso vencido; lo demás, quiz normal.\nconst TEST_SIZE = 3;\nfunction quizHeader({ title, level, format, origin, test_pos }) {\n  const t = inlineHtml(title);\n  const head = origin === 'hoy' ? `📝 <b>Test de la lección · ${t}</b> (${test_pos}/${TEST_SIZE})`\n    : origin === 'repaso' ? `🔁 <b>Repaso · ${t}</b>`\n      : `🧠 <b>Quiz · ${t}</b>`;\n  return `${head}\\n<i>Nivel ${LEVEL_LABEL[level] ?? level}${format === 'cloze' ? ' · completa el espacio' : ''}</i>`;\n}\n\n// Mensaje con la pregunta (los botones A-D los agrega el nodo de Telegram).\nfunction formatQuestionMessage({ title, level, format, question, options, origin, test_pos }) {\n  const opts = options.map((o, i) => `<b>${LETTERS[i]})</b> ${inlineHtml(o)}`).join('\\n');\n  return `${quizHeader({ title, level, format, origin, test_pos })}\\n\\n${inlineHtml(question)}\\n\\n${opts}`;\n}\n\n// Mensaje editado después de responder: marca la elegida y la correcta, y\n// agrega la explicación, la fuente (de la metadata, nunca del LLM) y el progreso.\nfunction formatAnsweredMessage({ title, level, format, question, options, origin, test_pos }, r) {\n  const opts = options.map((o, i) => {\n    const mark = i === r.correct_index ? '✅' : i === r.selected_index ? '❌' : '▫️';\n    return `${mark} <b>${LETTERS[i]})</b> ${inlineHtml(o)}`;\n  }).join('\\n');\n  const verdict = r.is_correct ? '<b>¡Correcto!</b>' : `<b>Incorrecto.</b> La respuesta era la ${LETTERS[r.correct_index]}.`;\n  const lines = [quizHeader({ title, level, format, origin, test_pos }), '', inlineHtml(question), '', opts, '',\n    `${verdict} ${inlineHtml(r.explanation)}`, '',\n    `📚 <a href=\"${String(r.source_url).replace(/\"/g, '&quot;')}\">Fuente oficial</a>`];\n  const progress = progressLine(level, r);\n  if (progress) lines.push('', progress);\n  const test = testLine(r.test);\n  if (test) lines.push('', test);\n  return lines.join('\\n');\n}\n\n// Resultado del test de la lección: solo en la respuesta que lo cierra\n// (just_finished), así no se repite si hay doble toque.\nfunction testLine(t) {\n  if (!t || !t.just_finished) return '';\n  if (t.passed) {\n    return `🎉 <b>Test superado</b> (${t.correct}/${t.total}). El tema queda visto` +\n      (t.next_topic ? `; lo siguiente en la ruta es <b>${inlineHtml(t.next_topic)}</b>.` : ' y terminaste la ruta.');\n  }\n  return `📚 <b>Test: ${t.correct}/${t.total}.</b> Necesitas 2 aciertos para pasar de tema: repasa la lección y vuelve a intentarlo.`;\n}\n\n// -----------------------------------------------------------------------------\n// nextButton: el único botón que queda en el mensaje después de responder.\n// Telegram limita callback_data a 64 bytes: h:n:<uuid> ocupa 40.\n// -----------------------------------------------------------------------------\nfunction nextButton(r) {\n  const t = r?.test;\n  if (t && !t.finished) return { text: `Siguiente pregunta (${t.answered + 1}/${t.total}) ➡️`, data: `h:n:${t.test_id}` };\n  if (t && t.just_finished && t.passed) return { text: '📖 Siguiente lección', data: 'n:hoy' };\n  if (t && t.just_finished) return { text: '🔁 Repetir test', data: `h:t:${t.topic_order}` };\n  return { text: 'Otra pregunta ➡️', data: 'n:quiz' };\n}\n\n// Callback \"Siguiente pregunta\" del test: h:n:<uuid> → uuid; si no, null.\nfunction testIdFromCallback(data) {\n  const m = String(data ?? '').match(/^h:n:([0-9a-f-]{36})$/);\n  return m ? m[1] : null;\n}\n\nfunction progressLine(oldLevel, r) {\n  const out = [];\n  if (r.level_changed) {\n    const up = QUIZ_LEVELS.indexOf(r.level) > QUIZ_LEVELS.indexOf(oldLevel);\n    out.push(`${up ? '⬆️ Subes' : '⬇️ Bajas'} a nivel ${LEVEL_LABEL[r.level] ?? r.level} en este tema.`);\n  }\n  if (r.topic_status === 'dominado') out.push('🏆 Tema dominado.');\n  if (r.interval_days) out.push(`🔁 Próximo repaso de este tema: en ${r.interval_days} día${r.interval_days === 1 ? '' : 's'}.`);\n  return out.join('\\n');\n}\n\n// Texto corto del aviso del botón (answerCallbackQuery, máx. 200 caracteres).\nfunction answerToast(r) {\n  switch (r?.status) {\n    case 'ok': return r.is_correct ? '✅ ¡Correcta!' : '❌ Incorrecta';\n    case 'already_answered': return 'Ya respondiste esta pregunta.';\n    default: return 'Esta pregunta ya no está disponible.';\n  }\n}\n\n// -----------------------------------------------------------------------------\n// Deduplicación semántica (corrección de app-ure, que solo comparaba texto\n// exacto). Se embebe la pregunta con gemini-embedding-2 y se compara por coseno\n// con las preguntas recientes del mismo tema.\n//\n// dedupText: qué se embebe. variant 'B' (la que se usa) = la pregunta CON su\n// respuesta correcta: en una de completar el concepto evaluado está justo en el\n// espacio en blanco, y sin la respuesta \"integrity ______\" y \"¿qué atributo…?\"\n// no se parecen. 'A' = solo el enunciado (se conserva para la medición).\n// Prefijo simétrico \"task: sentence similarity\": aquí se comparan preguntas\n// con preguntas, no una consulta con un documento (eso es el asimétrico del RAG).\n// -----------------------------------------------------------------------------\n// Umbral calibrado con 70 pares reales (eval/fase5-dedup.json): con la\n// variante B detecta 10 de 10 duplicados y deja 1 falso positivo en el límite\n// (.gy-* frente a .gx-*, 0,943). Con la variante A no hay umbral que separe:\n// un duplicado quedaba en 0,913 y un par distinto en 0,931.\n// Un falso positivo cuesta un reintento; un falso negativo, una pregunta repetida.\nconst DEDUP_THRESHOLD = 0.935;\n// Contra cuántas preguntas recientes del mismo tema se compara.\nconst DEDUP_RECENT = 20;\n\nfunction dedupText({ question, options, correct_index, format }, variant = 'B') {\n  const clean = (s) => String(s ?? '').replace(/`/g, '').replace(/\\s+/g, ' ').trim();\n  const q = clean(question);\n  const answer = clean(options?.[correct_index]);\n  let text = q;\n  if (variant === 'B') text = format === 'cloze' && q.includes(BLANK) ? q.replace(BLANK, answer) : `${q} Respuesta: ${answer}`;\n  return `task: sentence similarity | query: ${text}`;\n}\n\nfunction cosine(a, b) {\n  let dot = 0, na = 0, nb = 0;\n  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }\n  return na && nb ? dot / Math.sqrt(na * nb) : 0;\n}\n\n// \"/quiz navbar\" → \"navbar\"; \"/quiz css grid\" → \"css-grid\"; \"/quiz\" → null.\nfunction topicHint(text) {\n  const h = String(text ?? '').trim().replace(/^\\/quiz(@\\w+)?/i, '').trim().toLowerCase().replace(/\\s+/g, '-');\n  return h ? h.slice(0, 40) : null;\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  WINDOW_BY_LEVEL, QUIZ_SCHEMA, BLANK,\n  pickWindow, useCloze, buildQuizPrompt, parseQuizJson, validateQuiz, shuffleOptions,\n  inlineHtml, formatQuestionMessage, formatAnsweredMessage, answerToast, topicHint,\n  TEST_SIZE, testLine, nextButton, testIdFromCallback,\n  DEDUP_THRESHOLD, DEDUP_RECENT, dedupText, cosine,\n};\n\n\nconst v = $('Validar').item.json;\nconst values = $('Embeber pregunta').item.json.embedding?.values ?? null;\nconst sim = $json.sim == null ? null : Number($json.sim);\n// Repetida: un reintento pidiendo otro concepto. En el último intento se\n// acepta igual (mejor una pregunta parecida que ninguna) y queda registrado.\nif (sim !== null && sim >= DEDUP_THRESHOLD && v.attempt < 2) {\n  return { json: { ...v, retry: true, dedup_retry: true, dedup_sim: sim, rejected: [...v.rejected, ['repetida (' + sim.toFixed(3) + ')']],\n    errors: ['La pregunta es casi igual a una que ya se hizo de este tema (similitud ' + sim.toFixed(2) + '): \"' +\n      $json.similar_question + '\". Pregunta por OTRO concepto de los fragmentos, no por el mismo con otras palabras.'] } };\n}\nreturn { json: { ...v, retry: false, dedup_sim: sim, emb: values ? '[' + values.join(',') + ']' : '' } };"
+      },
+      "notes": "Umbral calibrado con 70 pares reales: eval/fase5-dedup.json (quiz-lib.DEDUP_THRESHOLD)."
+    },
+    {
+      "id": "g10f",
+      "name": "¿Repetida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2530,
+        -420
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g10f-c",
+              "leftValue": "={{ $json.retry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "g11",
+      "name": "Error LLM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        60
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const p = $('Armar prompt').item.json;\nconst { prompt_text, ...state } = p;\nreturn { json: { ...state, outcome: 'error',\n  error: String($json.error?.description || $json.error?.message || $json.error || 'desconocido').slice(0, 300),\n  message: 'No pude generar la pregunta ahora (el modelo no respondió). Intenta /quiz en un minuto.' } };"
+      }
+    },
+    {
+      "id": "g12",
+      "name": "Resultado",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {},
+      "notes": "Punto único de convergencia: ok, no_topic o error."
+    },
+    {
+      "id": "g13",
+      "name": "¿Pregunta lista?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2420,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g13-c",
+              "leftValue": "={{ $json.outcome }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "g14",
+      "name": "Guardar",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2640,
+        -140
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- quiz/02_guardar.sql — [BS] Generar quiz, nodo \"Guardar\"\n--\n-- Guarda la pregunta ya validada y barajada. RETURNING id: ese uuid viaja en el\n-- callback_data de cada botón (q:<uuid>:<índice>, 40 bytes de los 64 que\n-- permite Telegram). La fuente (source_url) sale de la metadata del fragmento\n-- que eligió el modelo, nunca de su texto. test_id: solo en las preguntas del\n-- test de la lección (Fase 5).\n-- question_embedding: el vector de la deduplicación semántica (quiz-lib\n-- dedupText, variante B); las próximas preguntas del tema se comparan con él.\n-- NULL si Gemini no respondió (la pregunta se guarda igual).\n-- =============================================================================\n\nINSERT INTO quiz_questions (chat_id, topic_key, origin, test_id, chunk_ids, difficulty, format, question, options,\n                            correct_index, explanation, source_url, question_embedding,\n                            model, prompt_tokens, completion_tokens)\nSELECT x.chat_id, x.topic_key, x.origin, x.test_id, x.chunk_ids, x.difficulty, x.format, x.question, x.options,\n       x.correct_index, x.explanation, x.source_url, nullif(x.emb, '')::vector,\n       x.model, x.prompt_tokens, x.completion_tokens\n  FROM jsonb_to_record($1::jsonb) AS x(\n         chat_id bigint, topic_key text, origin text, test_id uuid, chunk_ids uuid[], difficulty text, format text,\n         question text, options jsonb, correct_index smallint, explanation text, source_url text, emb text,\n         model text, prompt_tokens int, completion_tokens int)\nRETURNING id;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: $json.chat_id, topic_key: $json.topic_key, origin: $json.origin, test_id: $json.test_id,\n  chunk_ids: $json.chunk_ids, difficulty: $json.level, format: $json.format, question: $json.question,\n  options: $json.options, correct_index: $json.correct_index, explanation: $json.explanation,\n  source_url: $json.source_url, emb: $json.emb, model: $json.model, prompt_tokens: $json.prompt_tokens, completion_tokens: $json.completion_tokens }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "INSERT en quiz_questions; RETURNING id para el callback_data de los botones."
+    },
+    {
+      "id": "g15",
+      "name": "¿dry_run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2860,
+        -140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g15-c",
+              "leftValue": "={{ $('Resultado').first().json.dry_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "g16",
+      "name": "Enviar pregunta",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3080,
+        -60
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Resultado').first().json.chat_id }}",
+        "text": "={{ $('Resultado').first().json.html }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "A",
+                    "additionalFields": {
+                      "callback_data": "={{ 'q:' + $('Guardar').first().json.id + ':0' }}"
+                    }
+                  },
+                  {
+                    "text": "B",
+                    "additionalFields": {
+                      "callback_data": "={{ 'q:' + $('Guardar').first().json.id + ':1' }}"
+                    }
+                  },
+                  {
+                    "text": "C",
+                    "additionalFields": {
+                      "callback_data": "={{ 'q:' + $('Guardar').first().json.id + ':2' }}"
+                    }
+                  },
+                  {
+                    "text": "D",
+                    "additionalFields": {
+                      "callback_data": "={{ 'q:' + $('Guardar').first().json.id + ':3' }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "notes": "Las opciones van en el texto (los botones cortan textos largos); cada botón lleva q:<uuid>:<índice>."
+    },
+    {
+      "id": "g17",
+      "name": "¿dry_run aviso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2640,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "g17-c",
+              "leftValue": "={{ $('Resultado').first().json.dry_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "g18",
+      "name": "Enviar aviso",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2860,
+        220
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Resultado').first().json.chat_id }}",
+        "text": "={{ $('Resultado').first().json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      }
+    },
+    {
+      "id": "g19",
+      "name": "Salida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        -240
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Lo que recibe [BS] Test Quiz: la pregunta tal como se guardó, sin el prompt.\nconst r = $('Resultado').first().json;\nconst id = $('Guardar').isExecuted ? $('Guardar').first().json.id : null;\nreturn [{ json: { id, outcome: r.outcome, message: r.message ?? null, error: r.error ?? null,\n  topic_key: r.topic_key ?? null, motivo: r.motivo ?? null, origin: r.origin ?? null, test_id: r.test_id ?? null,\n  test_pos: r.test_pos ?? null, level: r.level ?? null, format: r.format ?? null,\n  question: r.question ?? null, options: r.options ?? null, correct_index: r.correct_index ?? null,\n  explanation: r.explanation ?? null, source_url: r.source_url ?? null, rejected: r.rejected ?? [],\n  attempt: r.attempt ?? null, dedup_sim: r.dedup_sim ?? null, prompt_tokens: r.prompt_tokens ?? null, completion_tokens: r.completion_tokens ?? null } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Entrada": {
+      "main": [
+        [
+          {
+            "node": "Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar": {
+      "main": [
+        [
+          {
+            "node": "¿Botón?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Botón?": {
+      "main": [
+        [
+          {
+            "node": "Aceptar botón",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Elegir tema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aceptar botón": {
+      "main": [
+        [
+          {
+            "node": "Reclamar botón",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclamar botón": {
+      "main": [
+        [
+          {
+            "node": "¿Primera vez?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Primera vez?": {
+      "main": [
+        [
+          {
+            "node": "Elegir tema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elegir tema": {
+      "main": [
+        [
+          {
+            "node": "Armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar prompt": {
+      "main": [
+        [
+          {
+            "node": "¿Sin tema?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Sin tema?": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generar pregunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar pregunta": {
+      "main": [
+        [
+          {
+            "node": "Validar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar": {
+      "main": [
+        [
+          {
+            "node": "¿Reintentar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Reintentar?": {
+      "main": [
+        [
+          {
+            "node": "Armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Válida?": {
+      "main": [
+        [
+          {
+            "node": "Embeber pregunta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeber pregunta": {
+      "main": [
+        [
+          {
+            "node": "Buscar parecida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar parecida": {
+      "main": [
+        [
+          {
+            "node": "Decidir dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidir dedup": {
+      "main": [
+        [
+          {
+            "node": "¿Repetida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Repetida?": {
+      "main": [
+        [
+          {
+            "node": "Armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error LLM": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resultado": {
+      "main": [
+        [
+          {
+            "node": "¿Pregunta lista?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Pregunta lista?": {
+      "main": [
+        [
+          {
+            "node": "Guardar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿dry_run aviso?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar": {
+      "main": [
+        [
+          {
+            "node": "¿dry_run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿dry_run?": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar pregunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿dry_run aviso?": {
+      "main": [
+        [
+          {
+            "node": "Salida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

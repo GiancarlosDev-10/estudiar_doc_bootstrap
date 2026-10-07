@@ -30,15 +30,15 @@ const MODELOS = [
   { provider: 'openai', model: 'gpt-5.4-mini' },
   { provider: 'gemini', model: 'gemini-3.7-flash' },
   { provider: 'gemini', model: 'gemini-3.5-flash' },
-  // Agregado el 2026-10-05: en la Fase 3 se descartó con solo 4 preguntas; con
-  // 20 se confirma o no (cuesta ~4 veces menos que gpt-5.4-mini).
+  // En la Fase 3 se descartó con solo 4 preguntas; con 20 se confirma o no
+  // (cuesta ~4 veces menos que gpt-5.4-mini).
   { provider: 'openai', model: 'gpt-4o-mini' },
 ];
 // Un juez por familia, que no compite (ver prompts/juez.md). El de OpenAI es
-// gpt-4o-mini por costo (decisión del usuario, 2026-10-05): ~US$ 0,02 los 60
-// juicios frente a ~US$ 0,90 con gpt-5.5. Es más débil que gpt-5.4-mini, pero
-// juzga contra una referencia ya verificada, no con su propio conocimiento, y
-// lo compensan el juez de Gemini y la revisión manual de los casos dudosos.
+// gpt-4o-mini por costo: ~US$ 0,02 los 60 juicios frente a ~US$ 0,90 con
+// gpt-5.5. Es más débil que gpt-5.4-mini, pero juzga contra una referencia ya
+// verificada, no con su propio conocimiento, y lo compensan el juez de Gemini
+// y la revisión manual de los casos dudosos.
 const JUECES = { openai: 'gpt-4o-mini', gemini: 'gemini-3.8-flash' };
 
 const argv = process.argv.slice(2);

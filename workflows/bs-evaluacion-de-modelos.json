@@ -1,0 +1,489 @@
+{
+  "name": "[BS] Evaluación de modelos",
+  "nodes": [
+    {
+      "id": "e1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bs-eval-modelos",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR_TEST_SECRET",
+          "name": "BS Test RAG Secret"
+        }
+      },
+      "notes": "Header X-BS-Test-Secret. Body: una pregunta de eval/preguntas.json + modelos + jueces, o { accion: \"modelos\" }."
+    },
+    {
+      "id": "e2",
+      "name": "¿Listar modelos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e2-c",
+              "leftValue": "={{ $json.body?.accion ?? \"\" }}",
+              "rightValue": "modelos",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e3",
+      "name": "Modelos OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        -200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.openai.com/v1/models",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REEMPLAZAR_OPENAI",
+          "name": "OpenAI account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e4",
+      "name": "Modelos Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        -200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_GEMINI",
+          "name": "BS Gemini"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e5",
+      "name": "Lista de modelos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Ojo (Fase 3): que un modelo aparezca listado no garantiza que se pueda usar.\nconst oa = ($('Modelos OpenAI').first().json.data ?? []).map((m) => m.id).sort();\nconst ge = ($input.first().json.models ?? [])\n  .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))\n  .map((m) => m.name.replace('models/', '')).sort();\nreturn [{ json: { openai: oa, gemini: ge } }];"
+      }
+    },
+    {
+      "id": "e2b",
+      "name": "¿Solo juzgar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        330,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e2b-c",
+              "leftValue": "={{ $json.body?.accion ?? \"\" }}",
+              "rightValue": "juzgar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "accion \"juzgar\": las respuestas ya están guardadas (body.respuestas, alineadas con body.modelos); solo se vuelven a juzgar. Sirve para que todas queden calificadas por los mismos jueces."
+    },
+    {
+      "id": "e6b",
+      "name": "Respuestas dadas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Misma forma que la salida de [BS] Pregunta libre en modo eval: \"Armar juicio\" no nota la diferencia.\nconst b = $input.first().json.body;\nif (!b.respuestas?.length || b.respuestas.length !== b.modelos?.length) throw new Error('respuestas y modelos deben tener el mismo largo');\nreturn b.respuestas.map((r) => ({ json: r }));"
+      }
+    },
+    {
+      "id": "e6",
+      "name": "Preparar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Un item por modelo: la misma pregunta, en modo eval.\nconst b = $input.first().json.body ?? {};\nconst q = b.pregunta;\nif (!q?.pregunta || !b.modelos?.length || !b.jueces?.openai || !b.jueces?.gemini) {\n  throw new Error('Body incompleto: pregunta, modelos y jueces { openai, gemini }');\n}\nreturn b.modelos.map((m) => ({ json: {\n  chat_id: 0, dry_run: true, source: 'eval', ignore_umbral: true,\n  text: q.pregunta, force_model: { provider: m.provider, model: m.model },\n} }));"
+      }
+    },
+    {
+      "id": "e7",
+      "name": "Pregunta libre",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ID_PREGUNTA",
+          "mode": "id",
+          "cachedResultName": "[BS] Pregunta libre (RAG)"
+        },
+        "workflowInputs": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Un modelo a la vez (en secuencia): la latencia de uno no se mezcla con la de otro, y el free tier de Gemini aguanta mejor."
+    },
+    {
+      "id": "e8",
+      "name": "Armar juicio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// =============================================================================\n// eval-lib.js — Funciones puras de la Fase 6 (evaluación de modelos del RAG).\n// Las usan [BS] Evaluación de modelos (copiadas a sus nodos Code por\n// scripts/build-eval.js) y scripts/run-eval.js, que agrega los resultados.\n// Probadas con scripts/test-eval-lib.js.\n// =============================================================================\n\n// La frase fija de la regla 6 de prompts/rag.md (la misma que rag-lib.NOT_IN_DOCS).\nconst EVAL_NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\n// JSON Schema de la nota del juez. OpenAI: response_format json_schema strict.\nconst JUDGE_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['correcta', 'sin_errores', 'util', 'motivo'],\n  properties: {\n    correcta: { type: 'integer' },\n    sin_errores: { type: 'integer' },\n    util: { type: 'integer' },\n    motivo: { type: 'string' },\n  },\n};\n// Gemini usa su propio subconjunto de OpenAPI (tipos en mayúsculas).\nconst JUDGE_SCHEMA_GEMINI = {\n  type: 'OBJECT',\n  required: ['correcta', 'sin_errores', 'util', 'motivo'],\n  properties: {\n    correcta: { type: 'INTEGER' },\n    sin_errores: { type: 'INTEGER' },\n    util: { type: 'INTEGER' },\n    motivo: { type: 'STRING' },\n  },\n};\n\n// -----------------------------------------------------------------------------\n// answerForJudge: lo que vio el usuario. Si el bot se negó (outcome no_context),\n// el juez ve la frase fija; si hubo error, no hay respuesta que juzgar.\n// -----------------------------------------------------------------------------\nfunction answerForJudge(r) {\n  if (!r || r.outcome === 'error' || r.error && !r.answer_md) return null;\n  if (r.outcome === 'no_context') return EVAL_NOT_IN_DOCS;\n  return String(r.answer_md ?? '').trim() || null;\n}\n\n// Turno de usuario del juez. Sin el nombre del modelo: el juez no sabe quién escribió.\nfunction buildJudgePrompt(q, answer) {\n  const list = (xs) => (xs?.length ? xs.map((x) => `- ${x}`).join('\\n') : '- (nada)');\n  // En una variable: devolver directamente un array literal de textos lo marca\n  // el validador de n8n-mcp como salida inválida de un nodo Code (lee el código\n  // como texto, comentarios incluidos).\n  const lines = [\n    `Tipo de pregunta: ${q.tipo}`,\n    `Pregunta del usuario: ${q.pregunta}`,\n    '',\n    `Respuesta de referencia: ${q.esperada}`,\n    '',\n    'Debe cubrir:', list(q.debe),\n    '',\n    'La invalida (no_debe):', list(q.no_debe),\n    '',\n    'Respuesta a evaluar:',\n    '\"\"\"',\n    answer,\n    '\"\"\"',\n  ];\n  return lines.join('\\n');\n}\n\nconst clamp = (n, max) => (Number.isInteger(n) ? Math.min(Math.max(n, 0), max) : null);\n\n// -----------------------------------------------------------------------------\n// parseJudge: texto JSON del juez → { correcta, sin_errores, util, total, motivo }\n// o null si no se puede leer. Notas fuera de rango se recortan al rango.\n// -----------------------------------------------------------------------------\nfunction parseJudge(text) {\n  try {\n    const s = String(text ?? '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/```$/, '');\n    const o = JSON.parse(s);\n    const correcta = clamp(o.correcta, 2);\n    const sin_errores = clamp(o.sin_errores, 2);\n    const util = clamp(o.util, 1);\n    if ([correcta, sin_errores, util].some((x) => x === null)) return null;\n    return { correcta, sin_errores, util, total: correcta + sin_errores + util, motivo: String(o.motivo ?? '').slice(0, 400) };\n  } catch { return null; }\n}\n\n// Texto y tokens de la respuesta de cada API (OpenAI chat/completions o Gemini generateContent).\nfunction judgeText(resp) {\n  if (resp?.choices) return resp.choices[0]?.message?.content ?? '';\n  return (resp?.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought && p.text).map((p) => p.text).join('');\n}\nfunction judgeTokens(resp) {\n  if (resp?.usage) return { prompt: resp.usage.prompt_tokens ?? 0, completion: resp.usage.completion_tokens ?? 0 };\n  const u = resp?.usageMetadata ?? {};\n  // En Gemini los tokens de \"pensamiento\" se cobran como salida.\n  return { prompt: u.promptTokenCount ?? 0, completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0) };\n}\n\n// -----------------------------------------------------------------------------\n// autoChecks: comprobaciones por código, que no dependen de ningún juez.\n// -----------------------------------------------------------------------------\nconst baseUrl = (u) => String(u ?? '').split('#')[0].replace(/\\/?$/, '/');\nfunction autoChecks(q, r) {\n  const error = !r || r.outcome === 'error';\n  const nego = r?.outcome === 'no_context';\n  const cited = r?.cited_urls ?? [];\n  const fuenteOk = !q.fuentes?.length ? null\n    : cited.some((c) => q.fuentes.some((f) => f.includes('#') ? c === f : baseUrl(c) === baseUrl(f)));\n  return {\n    error,\n    nego,\n    // Negarse es lo correcto solo en las preguntas \"fuera\".\n    negativa_ok: error ? false : (q.tipo === 'fuera' ? nego : !nego),\n    v4_en_codigo: (r?.v4_hits ?? []).length > 0,\n    cita: error || nego ? null : cited.length > 0,\n    fuente_esperada: error || nego ? null : fuenteOk,\n  };\n}\n\n// Costo en USD con la tabla de precios por 1M de tokens.\nfunction costUsd(precios, model, promptTokens, completionTokens) {\n  const p = precios?.[model];\n  if (!p) return null;\n  return (Number(promptTokens || 0) * p.input + Number(completionTokens || 0) * p.output) / 1e6;\n}\n\n// Nota final: promedio de los jueces que respondieron (0-5).\nfunction finalScore(jueces) {\n  const ok = (jueces ?? []).filter(Boolean);\n  if (!ok.length) return null;\n  return ok.reduce((a, j) => a + j.total, 0) / ok.length;\n}\n\n// -----------------------------------------------------------------------------\n// needsManualReview: casos para la revisión manual del usuario.\n//   - los dos jueces difieren en 2 puntos o más;\n//   - un juez da correcta 2 pero la comprobación automática dice que la\n//     negativa estuvo mal (o al revés: negativa correcta y nota 0);\n//   - nota final baja (≤ 2,5) o sin nota.\n// -----------------------------------------------------------------------------\nfunction needsManualReview(row) {\n  const reasons = [];\n  const [a, b] = row.jueces ?? [];\n  if (a && b && Math.abs(a.total - b.total) >= 2) reasons.push(`jueces en desacuerdo (${a.total} vs ${b.total})`);\n  const maxCorrecta = Math.max(...(row.jueces ?? []).filter(Boolean).map((j) => j.correcta), -1);\n  if (!row.auto.error && !row.auto.negativa_ok && maxCorrecta === 2) reasons.push('negativa incorrecta pero un juez dio correcta 2');\n  if (row.auto.v4_en_codigo && (row.jueces ?? []).some((j) => j && j.sin_errores === 2)) reasons.push('v4 en el código pero un juez dio sin_errores 2');\n  if (row.nota == null) reasons.push('sin nota de los jueces');\n  else if (row.nota <= 2.5) reasons.push(`nota baja (${row.nota})`);\n  return reasons;\n}\n\nconst percentile = (xs, p) => {\n  const s = xs.filter((x) => x != null).sort((a, b) => a - b);\n  return s.length ? s[Math.min(s.length - 1, Math.floor((s.length - 1) * p))] : null;\n};\nconst mean = (xs) => { const s = xs.filter((x) => x != null); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null; };\n\n// -----------------------------------------------------------------------------\n// summarize: una fila por modelo para la tabla comparativa. La nota usa la\n// manual cuando existe (row.nota_manual), si no la de los jueces.\n// -----------------------------------------------------------------------------\nfunction summarize(rows) {\n  const byModel = {};\n  for (const r of rows) (byModel[r.model] ||= []).push(r);\n  return Object.entries(byModel).map(([model, rs]) => {\n    const ok = rs.filter((r) => !r.auto.error);\n    const nota = (r) => (r.nota_manual ?? r.nota);\n    const tipo = (t) => mean(rs.filter((r) => r.tipo === t).map((r) => (r.auto.error ? 0 : nota(r))));\n    return {\n      model,\n      preguntas: rs.length,\n      errores: rs.length - ok.length,\n      // Disponibilidad: llamadas fallidas (503 del free tier, etc.) sobre el total\n      // de intentos, contando los reintentos de run-eval.js --reintentar.\n      disponibilidad: (() => {\n        const fallos = rs.reduce((a, r) => a + (r.fallos_previos ?? 0) + (r.auto.error ? 1 : 0), 0);\n        const intentos = rs.reduce((a, r) => a + (r.fallos_previos ?? 0) + 1, 0);\n        return { fallos, intentos };\n      })(),\n      nota_media: mean(rs.map((r) => (r.auto.error ? 0 : nota(r)))),\n      nota_normal: tipo('normal'),\n      nota_trampa_v4: tipo('trampa_v4'),\n      nota_fuera: tipo('fuera'),\n      correctas_2: rs.filter((r) => !r.auto.error && (r.jueces ?? []).filter(Boolean).every((j) => j.correcta === 2) && r.jueces?.some(Boolean)).length,\n      negativas_ok: rs.filter((r) => r.auto.negativa_ok).length,\n      v4_en_codigo: rs.filter((r) => r.auto.v4_en_codigo).length,\n      fuente_esperada: `${ok.filter((r) => r.auto.fuente_esperada).length}/${ok.filter((r) => r.auto.fuente_esperada !== null).length}`,\n      latencia_p50_ms: percentile(ok.map((r) => r.latency_ms), 0.5),\n      latencia_p90_ms: percentile(ok.map((r) => r.latency_ms), 0.9),\n      costo_por_pregunta_usd: mean(ok.map((r) => r.cost_usd)),\n      tokens_salida_media: mean(ok.map((r) => r.completion_tokens)),\n    };\n  });\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  EVAL_NOT_IN_DOCS, JUDGE_SCHEMA, JUDGE_SCHEMA_GEMINI,\n  answerForJudge, buildJudgePrompt, parseJudge, judgeText, judgeTokens,\n  autoChecks, costUsd, finalScore, needsManualReview, summarize,\n};\n\n\nconst b = $('Webhook').first().json.body;\nconst q = b.pregunta;\nreturn $input.all().map((it, i) => {\n  const r = it.json;\n  const answer = answerForJudge(r);\n  return { json: {\n    model: b.modelos[i].model, provider: b.modelos[i].provider, r,\n    auto: autoChecks(q, r),\n    // Sin respuesta (error) no se juzga: el prompt queda vacío y \"Unir\" lo ignora.\n    judge_prompt: answer ? buildJudgePrompt(q, answer) : '',\n  } };\n});"
+      }
+    },
+    {
+      "id": "e9",
+      "name": "Juez OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: $('Webhook').first().json.body.jueces.openai,\n  messages: [{ role: 'system', content: \"Eres un evaluador estricto de las respuestas de un bot de estudio de **Bootstrap 5.3** que\\nresponde en español. Recibes la pregunta del usuario, su tipo, una respuesta de referencia\\n(comprobada en la documentación oficial de Bootstrap 5.3), los puntos que una buena respuesta\\ndebe cubrir, lo que la invalida, y la respuesta a evaluar. Califica SOLO esa respuesta.\\n\\nRúbrica:\\n\\n- \\\"correcta\\\" (0, 1 o 2):\\n  2 = responde lo que se pregunta y cubre lo esencial de la referencia y de los puntos \\\"debe\\\".\\n  1 = va en la dirección correcta pero le falta algo importante, o responde a medias.\\n  0 = incorrecta, no responde lo que se pregunta, o se niega sin motivo.\\n  Si el tipo es \\\"fuera\\\" (la pregunta no es sobre Bootstrap 5.3 o su documentación no la cubre):\\n  2 = dice que no está en la documentación de Bootstrap 5.3 y no da la receta del otro tema;\\n  0 = responde el tema ajeno (aunque lo responda bien).\\n  Si el tipo es \\\"trampa_v4\\\": para tener 2 tiene que aclarar que la sintaxis preguntada es de\\n  Bootstrap 4 y dar el equivalente de 5.3.\\n\\n- \\\"sin_errores\\\" (0, 1 o 2):\\n  2 = no afirma nada falso sobre Bootstrap 5.3 y no contiene nada de la lista \\\"no_debe\\\".\\n  1 = una imprecisión menor que no llevaría a un error real.\\n  0 = un error de fondo: da por válida sintaxis de Bootstrap 4, inventa una clase o atributo,\\n      o da un consejo que no funcionaría.\\n\\n- \\\"util\\\" (0 o 1):\\n  1 = directa y práctica: en español, con los nombres de clases en inglés, y con un ejemplo de\\n      código cuando el tema lo pide. En el tipo \\\"fuera\\\", una negativa breve también es útil.\\n  0 = confusa, rellena, demasiado larga para Telegram o sin lo práctico que se necesitaba.\\n\\nReglas:\\n- No premies la longitud: una respuesta corta y correcta vale más que una larga.\\n- Ignora las marcas de cita como [1] o [2]: las pone el sistema.\\n- Si la respuesta usa sintaxis de Bootstrap 4 solo para explicar que ya no existe, NO es error.\\n- \\\"motivo\\\": 1 o 2 frases en español con lo que decidió la nota (lo que falta o lo que está mal).\" }, { role: 'user', content: $json.judge_prompt || '(sin respuesta)' }],\n  response_format: { type: 'json_schema', json_schema: { name: 'nota', strict: true, schema: {\n \"type\": \"object\",\n \"additionalProperties\": false,\n \"required\": [\n  \"correcta\",\n  \"sin_errores\",\n  \"util\",\n  \"motivo\"\n ],\n \"properties\": {\n  \"correcta\": {\n   \"type\": \"integer\"\n  },\n  \"sin_errores\": {\n   \"type\": \"integer\"\n  },\n  \"util\": {\n   \"type\": \"integer\"\n  },\n  \"motivo\": {\n   \"type\": \"string\"\n  }\n }\n} } },\n  max_completion_tokens: 3000\n}) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REEMPLAZAR_OPENAI",
+          "name": "OpenAI account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "notes": "Juez 1 (familia OpenAI). No sabe qué modelo escribió la respuesta. System = prompts/juez.md."
+    },
+    {
+      "id": "e10",
+      "name": "Juez Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + $('Webhook').first().json.body.jueces.gemini + ':generateContent' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  systemInstruction: { parts: [{ text: \"Eres un evaluador estricto de las respuestas de un bot de estudio de **Bootstrap 5.3** que\\nresponde en español. Recibes la pregunta del usuario, su tipo, una respuesta de referencia\\n(comprobada en la documentación oficial de Bootstrap 5.3), los puntos que una buena respuesta\\ndebe cubrir, lo que la invalida, y la respuesta a evaluar. Califica SOLO esa respuesta.\\n\\nRúbrica:\\n\\n- \\\"correcta\\\" (0, 1 o 2):\\n  2 = responde lo que se pregunta y cubre lo esencial de la referencia y de los puntos \\\"debe\\\".\\n  1 = va en la dirección correcta pero le falta algo importante, o responde a medias.\\n  0 = incorrecta, no responde lo que se pregunta, o se niega sin motivo.\\n  Si el tipo es \\\"fuera\\\" (la pregunta no es sobre Bootstrap 5.3 o su documentación no la cubre):\\n  2 = dice que no está en la documentación de Bootstrap 5.3 y no da la receta del otro tema;\\n  0 = responde el tema ajeno (aunque lo responda bien).\\n  Si el tipo es \\\"trampa_v4\\\": para tener 2 tiene que aclarar que la sintaxis preguntada es de\\n  Bootstrap 4 y dar el equivalente de 5.3.\\n\\n- \\\"sin_errores\\\" (0, 1 o 2):\\n  2 = no afirma nada falso sobre Bootstrap 5.3 y no contiene nada de la lista \\\"no_debe\\\".\\n  1 = una imprecisión menor que no llevaría a un error real.\\n  0 = un error de fondo: da por válida sintaxis de Bootstrap 4, inventa una clase o atributo,\\n      o da un consejo que no funcionaría.\\n\\n- \\\"util\\\" (0 o 1):\\n  1 = directa y práctica: en español, con los nombres de clases en inglés, y con un ejemplo de\\n      código cuando el tema lo pide. En el tipo \\\"fuera\\\", una negativa breve también es útil.\\n  0 = confusa, rellena, demasiado larga para Telegram o sin lo práctico que se necesitaba.\\n\\nReglas:\\n- No premies la longitud: una respuesta corta y correcta vale más que una larga.\\n- Ignora las marcas de cita como [1] o [2]: las pone el sistema.\\n- Si la respuesta usa sintaxis de Bootstrap 4 solo para explicar que ya no existe, NO es error.\\n- \\\"motivo\\\": 1 o 2 frases en español con lo que decidió la nota (lo que falta o lo que está mal).\" }] },\n  contents: [{ role: 'user', parts: [{ text: $('Armar juicio').item.json.judge_prompt || '(sin respuesta)' }] }],\n  generationConfig: { temperature: 0, maxOutputTokens: 4000, responseMimeType: 'application/json', responseSchema: {\n \"type\": \"OBJECT\",\n \"required\": [\n  \"correcta\",\n  \"sin_errores\",\n  \"util\",\n  \"motivo\"\n ],\n \"properties\": {\n  \"correcta\": {\n   \"type\": \"INTEGER\"\n  },\n  \"sin_errores\": {\n   \"type\": \"INTEGER\"\n  },\n  \"util\": {\n   \"type\": \"INTEGER\"\n  },\n  \"motivo\": {\n   \"type\": \"STRING\"\n  }\n }\n} }\n}) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REEMPLAZAR_GEMINI",
+          "name": "BS Gemini"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 8000,
+      "onError": "continueRegularOutput",
+      "notes": "Juez 2 (familia Gemini), misma rúbrica. Sin thinkingBudget: el juez puede razonar."
+    },
+    {
+      "id": "e11",
+      "name": "Unir",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// =============================================================================\n// eval-lib.js — Funciones puras de la Fase 6 (evaluación de modelos del RAG).\n// Las usan [BS] Evaluación de modelos (copiadas a sus nodos Code por\n// scripts/build-eval.js) y scripts/run-eval.js, que agrega los resultados.\n// Probadas con scripts/test-eval-lib.js.\n// =============================================================================\n\n// La frase fija de la regla 6 de prompts/rag.md (la misma que rag-lib.NOT_IN_DOCS).\nconst EVAL_NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\n// JSON Schema de la nota del juez. OpenAI: response_format json_schema strict.\nconst JUDGE_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['correcta', 'sin_errores', 'util', 'motivo'],\n  properties: {\n    correcta: { type: 'integer' },\n    sin_errores: { type: 'integer' },\n    util: { type: 'integer' },\n    motivo: { type: 'string' },\n  },\n};\n// Gemini usa su propio subconjunto de OpenAPI (tipos en mayúsculas).\nconst JUDGE_SCHEMA_GEMINI = {\n  type: 'OBJECT',\n  required: ['correcta', 'sin_errores', 'util', 'motivo'],\n  properties: {\n    correcta: { type: 'INTEGER' },\n    sin_errores: { type: 'INTEGER' },\n    util: { type: 'INTEGER' },\n    motivo: { type: 'STRING' },\n  },\n};\n\n// -----------------------------------------------------------------------------\n// answerForJudge: lo que vio el usuario. Si el bot se negó (outcome no_context),\n// el juez ve la frase fija; si hubo error, no hay respuesta que juzgar.\n// -----------------------------------------------------------------------------\nfunction answerForJudge(r) {\n  if (!r || r.outcome === 'error' || r.error && !r.answer_md) return null;\n  if (r.outcome === 'no_context') return EVAL_NOT_IN_DOCS;\n  return String(r.answer_md ?? '').trim() || null;\n}\n\n// Turno de usuario del juez. Sin el nombre del modelo: el juez no sabe quién escribió.\nfunction buildJudgePrompt(q, answer) {\n  const list = (xs) => (xs?.length ? xs.map((x) => `- ${x}`).join('\\n') : '- (nada)');\n  // En una variable: devolver directamente un array literal de textos lo marca\n  // el validador de n8n-mcp como salida inválida de un nodo Code (lee el código\n  // como texto, comentarios incluidos).\n  const lines = [\n    `Tipo de pregunta: ${q.tipo}`,\n    `Pregunta del usuario: ${q.pregunta}`,\n    '',\n    `Respuesta de referencia: ${q.esperada}`,\n    '',\n    'Debe cubrir:', list(q.debe),\n    '',\n    'La invalida (no_debe):', list(q.no_debe),\n    '',\n    'Respuesta a evaluar:',\n    '\"\"\"',\n    answer,\n    '\"\"\"',\n  ];\n  return lines.join('\\n');\n}\n\nconst clamp = (n, max) => (Number.isInteger(n) ? Math.min(Math.max(n, 0), max) : null);\n\n// -----------------------------------------------------------------------------\n// parseJudge: texto JSON del juez → { correcta, sin_errores, util, total, motivo }\n// o null si no se puede leer. Notas fuera de rango se recortan al rango.\n// -----------------------------------------------------------------------------\nfunction parseJudge(text) {\n  try {\n    const s = String(text ?? '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/```$/, '');\n    const o = JSON.parse(s);\n    const correcta = clamp(o.correcta, 2);\n    const sin_errores = clamp(o.sin_errores, 2);\n    const util = clamp(o.util, 1);\n    if ([correcta, sin_errores, util].some((x) => x === null)) return null;\n    return { correcta, sin_errores, util, total: correcta + sin_errores + util, motivo: String(o.motivo ?? '').slice(0, 400) };\n  } catch { return null; }\n}\n\n// Texto y tokens de la respuesta de cada API (OpenAI chat/completions o Gemini generateContent).\nfunction judgeText(resp) {\n  if (resp?.choices) return resp.choices[0]?.message?.content ?? '';\n  return (resp?.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought && p.text).map((p) => p.text).join('');\n}\nfunction judgeTokens(resp) {\n  if (resp?.usage) return { prompt: resp.usage.prompt_tokens ?? 0, completion: resp.usage.completion_tokens ?? 0 };\n  const u = resp?.usageMetadata ?? {};\n  // En Gemini los tokens de \"pensamiento\" se cobran como salida.\n  return { prompt: u.promptTokenCount ?? 0, completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0) };\n}\n\n// -----------------------------------------------------------------------------\n// autoChecks: comprobaciones por código, que no dependen de ningún juez.\n// -----------------------------------------------------------------------------\nconst baseUrl = (u) => String(u ?? '').split('#')[0].replace(/\\/?$/, '/');\nfunction autoChecks(q, r) {\n  const error = !r || r.outcome === 'error';\n  const nego = r?.outcome === 'no_context';\n  const cited = r?.cited_urls ?? [];\n  const fuenteOk = !q.fuentes?.length ? null\n    : cited.some((c) => q.fuentes.some((f) => f.includes('#') ? c === f : baseUrl(c) === baseUrl(f)));\n  return {\n    error,\n    nego,\n    // Negarse es lo correcto solo en las preguntas \"fuera\".\n    negativa_ok: error ? false : (q.tipo === 'fuera' ? nego : !nego),\n    v4_en_codigo: (r?.v4_hits ?? []).length > 0,\n    cita: error || nego ? null : cited.length > 0,\n    fuente_esperada: error || nego ? null : fuenteOk,\n  };\n}\n\n// Costo en USD con la tabla de precios por 1M de tokens.\nfunction costUsd(precios, model, promptTokens, completionTokens) {\n  const p = precios?.[model];\n  if (!p) return null;\n  return (Number(promptTokens || 0) * p.input + Number(completionTokens || 0) * p.output) / 1e6;\n}\n\n// Nota final: promedio de los jueces que respondieron (0-5).\nfunction finalScore(jueces) {\n  const ok = (jueces ?? []).filter(Boolean);\n  if (!ok.length) return null;\n  return ok.reduce((a, j) => a + j.total, 0) / ok.length;\n}\n\n// -----------------------------------------------------------------------------\n// needsManualReview: casos para la revisión manual del usuario.\n//   - los dos jueces difieren en 2 puntos o más;\n//   - un juez da correcta 2 pero la comprobación automática dice que la\n//     negativa estuvo mal (o al revés: negativa correcta y nota 0);\n//   - nota final baja (≤ 2,5) o sin nota.\n// -----------------------------------------------------------------------------\nfunction needsManualReview(row) {\n  const reasons = [];\n  const [a, b] = row.jueces ?? [];\n  if (a && b && Math.abs(a.total - b.total) >= 2) reasons.push(`jueces en desacuerdo (${a.total} vs ${b.total})`);\n  const maxCorrecta = Math.max(...(row.jueces ?? []).filter(Boolean).map((j) => j.correcta), -1);\n  if (!row.auto.error && !row.auto.negativa_ok && maxCorrecta === 2) reasons.push('negativa incorrecta pero un juez dio correcta 2');\n  if (row.auto.v4_en_codigo && (row.jueces ?? []).some((j) => j && j.sin_errores === 2)) reasons.push('v4 en el código pero un juez dio sin_errores 2');\n  if (row.nota == null) reasons.push('sin nota de los jueces');\n  else if (row.nota <= 2.5) reasons.push(`nota baja (${row.nota})`);\n  return reasons;\n}\n\nconst percentile = (xs, p) => {\n  const s = xs.filter((x) => x != null).sort((a, b) => a - b);\n  return s.length ? s[Math.min(s.length - 1, Math.floor((s.length - 1) * p))] : null;\n};\nconst mean = (xs) => { const s = xs.filter((x) => x != null); return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null; };\n\n// -----------------------------------------------------------------------------\n// summarize: una fila por modelo para la tabla comparativa. La nota usa la\n// manual cuando existe (row.nota_manual), si no la de los jueces.\n// -----------------------------------------------------------------------------\nfunction summarize(rows) {\n  const byModel = {};\n  for (const r of rows) (byModel[r.model] ||= []).push(r);\n  return Object.entries(byModel).map(([model, rs]) => {\n    const ok = rs.filter((r) => !r.auto.error);\n    const nota = (r) => (r.nota_manual ?? r.nota);\n    const tipo = (t) => mean(rs.filter((r) => r.tipo === t).map((r) => (r.auto.error ? 0 : nota(r))));\n    return {\n      model,\n      preguntas: rs.length,\n      errores: rs.length - ok.length,\n      // Disponibilidad: llamadas fallidas (503 del free tier, etc.) sobre el total\n      // de intentos, contando los reintentos de run-eval.js --reintentar.\n      disponibilidad: (() => {\n        const fallos = rs.reduce((a, r) => a + (r.fallos_previos ?? 0) + (r.auto.error ? 1 : 0), 0);\n        const intentos = rs.reduce((a, r) => a + (r.fallos_previos ?? 0) + 1, 0);\n        return { fallos, intentos };\n      })(),\n      nota_media: mean(rs.map((r) => (r.auto.error ? 0 : nota(r)))),\n      nota_normal: tipo('normal'),\n      nota_trampa_v4: tipo('trampa_v4'),\n      nota_fuera: tipo('fuera'),\n      correctas_2: rs.filter((r) => !r.auto.error && (r.jueces ?? []).filter(Boolean).every((j) => j.correcta === 2) && r.jueces?.some(Boolean)).length,\n      negativas_ok: rs.filter((r) => r.auto.negativa_ok).length,\n      v4_en_codigo: rs.filter((r) => r.auto.v4_en_codigo).length,\n      fuente_esperada: `${ok.filter((r) => r.auto.fuente_esperada).length}/${ok.filter((r) => r.auto.fuente_esperada !== null).length}`,\n      latencia_p50_ms: percentile(ok.map((r) => r.latency_ms), 0.5),\n      latencia_p90_ms: percentile(ok.map((r) => r.latency_ms), 0.9),\n      costo_por_pregunta_usd: mean(ok.map((r) => r.cost_usd)),\n      tokens_salida_media: mean(ok.map((r) => r.completion_tokens)),\n    };\n  });\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  EVAL_NOT_IN_DOCS, JUDGE_SCHEMA, JUDGE_SCHEMA_GEMINI,\n  answerForJudge, buildJudgePrompt, parseJudge, judgeText, judgeTokens,\n  autoChecks, costUsd, finalScore, needsManualReview, summarize,\n};\n\n\n// Los tres nodos devuelven un item por modelo, en el mismo orden.\nconst arm = $('Armar juicio').all().map((i) => i.json);\nconst oa = $('Juez OpenAI').all().map((i) => i.json);\nconst ge = $input.all().map((i) => i.json);\nconst b = $('Webhook').first().json.body;\nconst results = arm.map((a, i) => {\n  const judged = !!a.judge_prompt;\n  const jo = judged ? parseJudge(judgeText(oa[i])) : null;\n  const jg = judged ? parseJudge(judgeText(ge[i])) : null;\n  const { parts, ...r } = a.r;\n  return { id: b.pregunta.id, tipo: b.pregunta.tipo, model: a.model, provider: a.provider, ...r,\n    auto: a.auto, jueces_modelos: b.jueces,\n    jueces: [jo, jg],\n    juez_tokens: [judgeTokens(oa[i]), judgeTokens(ge[i])],\n    juez_error: [judged && !jo ? String(oa[i].error?.message ?? judgeText(oa[i])).slice(0, 200) : null,\n                 judged && !jg ? String(ge[i].error?.message ?? judgeText(ge[i])).slice(0, 200) : null],\n    nota: finalScore([jo, jg]) };\n});\nreturn [{ json: { pregunta: b.pregunta.id, jueces: b.jueces, results } }];"
+      }
+    },
+    {
+      "id": "e12",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "¿Listar modelos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Listar modelos?": {
+      "main": [
+        [
+          {
+            "node": "Modelos OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Solo juzgar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Solo juzgar?": {
+      "main": [
+        [
+          {
+            "node": "Respuestas dadas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuestas dadas": {
+      "main": [
+        [
+          {
+            "node": "Armar juicio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelos OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Modelos Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelos Gemini": {
+      "main": [
+        [
+          {
+            "node": "Lista de modelos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lista de modelos": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar": {
+      "main": [
+        [
+          {
+            "node": "Pregunta libre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pregunta libre": {
+      "main": [
+        [
+          {
+            "node": "Armar juicio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar juicio": {
+      "main": [
+        [
+          {
+            "node": "Juez OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Juez OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Juez Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Juez Gemini": {
+      "main": [
+        [
+          {
+            "node": "Unir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}

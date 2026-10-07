@@ -6,7 +6,10 @@
 //
 // Uso:
 //   node scripts/build-pregunta.js --postgres <credId> --gemini <credId> \
-//     --telegram <credId> --openai <credId> --testSecret <credId> --out-dir tmp
+//     --telegram <credId> --openai <credId> --testSecret <credId> \
+//     --ids <archivo.json> --out-dir tmp
+// --ids: { pregunta } con el ID de este workflow (lo usa [BS] Test RAG para
+// invocarlo). No es un secreto; el primer despliegue lo crea y lo anota ahí.
 // Los IDs de credencial se pasan por argumento: nunca se guardan en el repo.
 //
 // Diseño (por qué hay los nodos que hay):
@@ -33,29 +36,13 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const EMBED_MODEL = 'gemini-embedding-2';
 const EMBED_DIMS = 1536;
-// Modelo fijo, no un alias "latest" que cambie solo. Ojo: GET v1beta/models
-// lista modelos que ya no admiten cuentas nuevas. gemini-2.5-flash aparecía
-// ahí, pero generateContent respondía 404 "no longer available to new users"
-// (2026-09-29), así que un modelo se valida llamándolo, no solo listándolo.
+// Modelo fijo, no un alias "latest" que cambie solo: GET v1beta/models puede
+// listar un modelo que ya no admite cuentas nuevas (ver generateContent).
 // Cadena de modelos: si uno falla (sin saldo, caído, 503, respuesta vacía), la
 // misma pregunta pasa al siguiente.
-// Historial: el 2026-09-29 se eligió gpt-5.4-mini tras comparar 5 preguntas
-// (mismos fragmentos y prompt): gpt-4o-mini salía ~$0,00056/pregunta pero 2 de
-// 4 respuestas con errores de fondo (en la #3 aconsejaba redefinir
-// $theme-colors entero); gpt-5.4-mini ~$0,0030/pregunta, correcto y con más
-// citas. Gemini free tier quedó como respaldo gratuito (ese día fallaba más
-// de la mitad de las llamadas con 503).
-// 2026-10-07: la Fase 6 (eval/fase6-resultados.json, 20 preguntas, mismos
-// fragmentos y prompt, juez gpt-4o-mini) dio gpt-4o-mini 4,85/5 (0/20 fallos
-// de API, p50 2,6 s, US$0,00048/pregunta) frente a gpt-5.4-mini 4,60
-// (0/20, 2,3 s, US$0,00257): la comparación de 5 preguntas de septiembre no
-// se repitió a 20. Con eso se vuelve a gpt-4o-mini como principal, ahora por
-// costo (~5× más barato) y porque este es un bot de prueba personal, no
-// producción. Ojo: el juez es indulgente y se juzga a sí mismo — en la
-// pregunta #15 (trampa de jumbotron, Bootstrap 4) gpt-4o-mini solo respondió
-// "Esto no está en la documentación de Bootstrap 5.3" cuando la página de
-// migración sí lo cubre, y el juez le dio 5 (real ~2). Ver
-// eval/fase6-conclusion.md para la tabla completa y las limitaciones.
+// gpt-4o-mini es el principal por costo y porque la Fase 6 lo midió mejor que
+// la alternativa en 20 preguntas (eval/fase6-conclusion.md tiene la tabla y
+// las limitaciones, incluida la indulgencia del juez automático).
 const MODELS = [
   { provider: 'openai', model: 'gpt-4o-mini' },
   { provider: 'gemini', model: 'gemini-3.7-flash' },
@@ -63,8 +50,7 @@ const MODELS = [
 ];
 // La reescritura de seguimientos usa el modelo principal: si corriera en un
 // Gemini saturado, fallaría en silencio (buscaría con la pregunta original) y
-// el bot perdería el hilo de "¿y en móvil?". Al cambiar MODELS[0] a
-// gpt-4o-mini (2026-10-07), la reescritura pasa a usar gpt-4o-mini también.
+// el bot perdería el hilo de "¿y en móvil?".
 const REWRITE_MODEL = MODELS[0].model;
 // Los modelos Flash "piensan" antes de responder y esos tokens salen del mismo
 // maxOutputTokens: con un tope bajo la respuesta puede llegar VACÍA. Con
@@ -73,18 +59,16 @@ const REWRITE_MODEL = MODELS[0].model;
 // en la Fase 6, no se supone.
 const THINKING = { thinkingBudget: 0 };
 // Umbral de similitud coseno: por debajo, "no está en la documentación" sin
-// llamar al LLM. Calibrado el 2026-09-29 con eval/fase3-umbral.json + el smoke
-// (17 preguntas, gemini-embedding-2 @1536):
+// llamar al LLM. Calibrado con eval/fase3-umbral.json (17 preguntas):
 //   dentro de la doc: 0,7188 … 0,7926   (la más baja: la trampa de v4)
 //   fuera de la doc:  0,4958 … 0,6621   (la más alta: "Bootstrap con Tailwind")
-// 0,68 cae en el hueco, más cerca del grupo "fuera": rechazar una pregunta
-// válida es peor que dejar pasar una ajena, que igual la frena la regla 6 del
-// prompt. Reajustar con datos reales: SELECT top_similarity FROM rag_queries.
+// 0,68 cae más cerca del grupo "fuera": rechazar una pregunta válida es peor
+// que dejar pasar una ajena, que igual la frena la regla 6 del prompt.
+// Reajustar con datos reales: SELECT top_similarity FROM rag_queries.
 // --umbral 1.01 genera una versión de calibración: nada supera el umbral, así
 // que solo se miden similitudes, sin gastar llamadas al LLM.
 const UMBRAL = process.argv.includes('--umbral') ? Number(arg('umbral')) : 0.68;
-// Idioma de la consulta de búsqueda (experimento del 2026-10-03, ver
-// eval/fase3-recuperacion.json):
+// Idioma de la consulta de búsqueda (ver eval/fase3-recuperacion.json):
 //   es = se busca con la pregunta en español; el LLM solo reescribe si hay
 //        historial (prompts/rag-reescribir.md).
 //   en = siempre se traduce al inglés, el idioma de la documentación, y de paso
@@ -96,7 +80,10 @@ if (!['es', 'en'].includes(CONSULTA)) throw new Error('--consulta debe ser es o 
 const TOPK = process.argv.includes('--topk') ? Number(arg('topk')) : 6;
 // ID de [BS] Pregunta libre (RAG) para [BS] Test RAG. Un workflow ID no es un
 // secreto; esta instancia no tiene feat:variables para pasarlo por variable.
-const PREGUNTA_WORKFLOW_ID = 'ry9T1L9MSmoOsqUl';
+const idsFile = arg('ids');
+const IDS = JSON.parse(fs.readFileSync(idsFile, 'utf8'));
+if (!IDS.pregunta) throw new Error(`--ids (${idsFile}): falta la clave "pregunta"`);
+const PREGUNTA_WORKFLOW_ID = IDS.pregunta;
 
 const pg = { postgres: { id: arg('postgres'), name: 'BS Postgres' } };
 const gemini = { googlePalmApi: { id: arg('gemini'), name: 'BS Gemini' } };

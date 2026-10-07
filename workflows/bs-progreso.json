@@ -1,0 +1,268 @@
+{
+  "name": "[BS] Progreso",
+  "nodes": [
+    {
+      "id": "p1",
+      "name": "Entrada",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "Del router: /progreso. De [BS] Test Estudio: { chat_id: 0, dry_run: true }."
+    },
+    {
+      "id": "p2",
+      "name": "Resumen",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- =============================================================================\n-- progreso/01_resumen.sql — [BS] Progreso, nodo \"Resumen\"\n--\n-- Una fila con todo lo que muestra /progreso:\n--   secciones: por sección de la ruta (en orden), temas, vistos y dominados.\n--   respondidas / aciertos: totales del chat.\n--   debiles: los 3 temas con peor tasa de acierto (al menos 2 respuestas y\n--            un fallo; misma definición que la selección del quiz).\n--   actual, vencidos, proximo_repaso: qué toca ahora.\n-- =============================================================================\n\nWITH p AS (\n  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint)\n),\nsec AS (\n  SELECT sp.section, min(sp.order_index) AS ord, count(*) AS temas,\n         count(tp.passed_at) AS vistos,\n         count(*) FILTER (WHERE tp.status = 'dominado') AS dominados\n    FROM study_path sp\n    CROSS JOIN p\n    LEFT JOIN topic_progress tp ON tp.chat_id = p.chat_id AND tp.topic_key = sp.topic_key\n   WHERE sp.order_index >= 0\n   GROUP BY sp.section\n),\ndeb AS (\n  SELECT sp.title, tp.correct, tp.wrong, tp.level,\n         round(100.0 * tp.correct / (tp.correct + tp.wrong))::int AS tasa\n    FROM topic_progress tp\n    JOIN study_path sp USING (topic_key)\n    CROSS JOIN p\n   WHERE tp.chat_id = p.chat_id AND tp.correct + tp.wrong >= 2 AND tp.wrong > 0\n   ORDER BY tp.correct::float8 / (tp.correct + tp.wrong), tp.wrong DESC\n   LIMIT 3\n)\nSELECT (SELECT json_agg(json_build_object('section', section, 'temas', temas, 'vistos', vistos, 'dominados', dominados)\n                        ORDER BY ord) FROM sec) AS secciones,\n       (SELECT count(*) FROM quiz_questions q WHERE q.chat_id = p.chat_id AND q.answered_at IS NOT NULL) AS respondidas,\n       (SELECT count(*) FROM quiz_questions q WHERE q.chat_id = p.chat_id AND q.is_correct) AS aciertos,\n       (SELECT coalesce(json_agg(json_build_object('title', title, 'correct', correct, 'wrong', wrong,\n                                                   'level', level, 'tasa', tasa) ORDER BY tasa, wrong DESC), '[]'::json)\n          FROM deb) AS debiles,\n       (SELECT title FROM study_path WHERE topic_key = current_topic(p.chat_id)) AS actual,\n       (SELECT count(*) FROM topic_progress tp WHERE tp.chat_id = p.chat_id AND tp.next_review_at <= now()) AS vencidos,\n       (SELECT min(tp.next_review_at) FROM topic_progress tp\n         WHERE tp.chat_id = p.chat_id AND tp.next_review_at > now()) AS proximo_repaso\n  FROM p;\n",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ chat_id: Number($json.chat_id) }) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR_POSTGRES",
+          "name": "BS Postgres"
+        }
+      },
+      "notes": "Una fila: avance por sección, totales, 3 temas débiles, tema actual y repasos vencidos."
+    },
+    {
+      "id": "p3",
+      "name": "Armar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// =============================================================================\n// rag-lib.js — Funciones puras de [BS] Pregunta libre (RAG). Sin dependencias,\n// probadas en local con scripts/test-rag-lib.js y copiadas a los nodos Code\n// por scripts/build-pregunta.js (mismo patrón que scripts/chunker.js).\n// =============================================================================\n\nconst TELEGRAM_MAX = 4096;\nconst PART_LIMIT = 3900; // margen para el footer de fuentes y el HTML añadido\n\n// Sintaxis de Bootstrap 4 que ya no existe (o cambió) en 5.3. Se busca solo\n// dentro de bloques de código: en el texto explicativo el LLM puede nombrar\n// \"ml-3\" para decir justamente que es de v4 (regla 3 del prompt).\nconst V4_PATTERNS = [\n  /\\bml-\\d\\b/, /\\bmr-\\d\\b/, /\\bpl-\\d\\b/, /\\bpr-\\d\\b/,\n  /\\bml-auto\\b/, /\\bmr-auto\\b/,\n  /data-toggle=/, /data-target=/, /data-dismiss=/,\n  /\\bfloat-left\\b/, /\\bfloat-right\\b/,\n  /\\bbadge-pill\\b/, /\\bform-group\\b/, /\\bcustom-select\\b/,\n  /\\bcustom-control\\b/, /\\bjumbotron\\b/,\n  /\\bmedia-body\\b/,\n];\n\n// -----------------------------------------------------------------------------\n// buildContext: arma el bloque de fragmentos numerados que se le pega al LLM\n// (turno de usuario, después del systemInstruction de prompts/rag.md).\n// chunks = filas de rag/02_buscar.sql, en el orden en que se van a citar.\n// -----------------------------------------------------------------------------\n// question = lo que escribió el usuario; searchQuery = la consulta con la que\n// se buscó (traducida al inglés y/o con el \"eso\" resuelto por el historial).\n// Si son distintas, el LLM ve las dos: la original conserva la intención, la\n// de búsqueda resuelve las referencias.\nfunction buildContext(chunks, question, searchQuery = question) {\n  const fragmentos = chunks\n    .map((c, i) => `[${i + 1}] (${headingText(c)})\\n${c.content}`)\n    .join('\\n\\n---\\n\\n');\n  const pregunta = searchQuery && searchQuery !== question\n    ? `${question}\\n(Consulta usada para buscar en la documentación: ${searchQuery})`\n    : question;\n  return `Fragmentos recuperados:\\n\\n${fragmentos}\\n\\nPregunta del usuario:\\n${pregunta}`;\n}\n\nfunction headingText(c) {\n  return Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : String(c.heading_path ?? '');\n}\n\n// -----------------------------------------------------------------------------\n// Lectura de la respuesta del LLM, sea Gemini (generateContent) u OpenAI\n// (chat/completions): la cadena de modelos usa los dos y \"Procesar respuesta\"\n// no debería saber cuál contestó.\n// Gemini Flash \"piensa\": puede traer partes de pensamiento (thought: true) que\n// no son texto para el usuario, y esos tokens se cobran aparte\n// (thoughtsTokenCount). En OpenAI, los tokens de razonamiento ya vienen dentro\n// de completion_tokens.\n// -----------------------------------------------------------------------------\nfunction llmText(response) {\n  if (response?.choices) return String(response.choices[0]?.message?.content ?? '').trim();\n  const parts = response?.candidates?.[0]?.content?.parts || [];\n  return parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n}\n\nfunction llmTokens(response) {\n  if (response?.usage) {\n    return { prompt: response.usage.prompt_tokens ?? 0, completion: response.usage.completion_tokens ?? 0 };\n  }\n  const u = response?.usageMetadata || {};\n  return {\n    prompt: u.promptTokenCount ?? 0,\n    completion: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0),\n  };\n}\n\n// -----------------------------------------------------------------------------\n// Frase fija de \"fuera de la documentación\" (regla 6 de prompts/rag.md). Si el\n// LLM responde con ella, el código lo trata como no_context: sin citas ni\n// lista de fuentes, aunque el modelo haya puesto alguna.\n// -----------------------------------------------------------------------------\nconst NOT_IN_DOCS = 'Esto no está en la documentación de Bootstrap 5.3.';\n\nfunction isNotInDocs(text) {\n  const norm = (s) => String(s).toLowerCase().replace(/[“”\"«»*]/g, '').trim();\n  return norm(text).startsWith(norm(NOT_IN_DOCS).replace(/\\.$/, ''));\n}\n\n// Resultado de \"Reescribir consulta\": IGUAL (o vacío, o algo raro) = usar la\n// pregunta original tal cual. Así el modelo no puede agregar palabras a una\n// pregunta que ya se entendía sola (ver prompts/rag-reescribir.md).\nfunction rewriteResult(text, original) {\n  const line = String(text ?? '').split('\\n')[0].replace(/^[\"'«“]|[\"'»”]$/g, '').trim();\n  if (!line || /^igual\\.?$/i.test(line) || line.length > 300) return original;\n  return line;\n}\n\n// Por qué terminó sin texto (para el mensaje de error y el registro).\nfunction llmFinishReason(response) {\n  return response?.choices?.[0]?.finish_reason ?? response?.candidates?.[0]?.finishReason ?? 'desconocido';\n}\n\nfunction escapeHtml(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n}\n\n// Inverso de lo anterior para el envío de respaldo en texto plano (cuando\n// Telegram rechaza el HTML): quitar solo las etiquetas dejaría \"&lt;div&gt;\"\n// a la vista. &amp; va al final para no des-escapar dos veces.\nfunction htmlToPlain(html) {\n  return String(html).replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');\n}\n\n// -----------------------------------------------------------------------------\n// extractCitations: números [n] citados en el markdown, en orden de aparición,\n// sin repetir. Sirve para el fallback (el LLM no citó nada) y para depurar.\n// -----------------------------------------------------------------------------\n// Los modelos a veces agrupan citas (\"[2, 3, 4]\") aunque el prompt pida una\n// por corchete. Se normalizan a \"[2][3][4]\" antes de todo lo demás, fuera de\n// los bloques de código (ahí un \"[1, 2]\" es un arreglo de JavaScript).\nfunction normalizeCitations(markdown) {\n  return String(markdown).split(/(```[\\s\\S]*?```)/g).map((seg) => seg.startsWith('```')\n    ? seg\n    : seg.replace(/\\[(\\d+(?:\\s*,\\s*\\d+)+)\\]/g, (_, list) => [...new Set(list.split(',').map((n) => n.trim()))].map((n) => `[${n}]`).join(''))\n  ).join('');\n}\n\nfunction extractCitations(markdown, chunkCount) {\n  const seen = new Set();\n  const out = [];\n  const re = /\\[(\\d+)\\]/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const n = Number(m[1]);\n    if (n >= 1 && n <= chunkCount && !seen.has(n)) { seen.add(n); out.push(n); }\n  }\n  return out;\n}\n\n// -----------------------------------------------------------------------------\n// buildSourcesFooter: bloque final \"📚 Fuentes\" en Markdown (se convierte a\n// HTML junto con el resto). chunks[n-1] da la URL y el heading de la cita n.\n// -----------------------------------------------------------------------------\nfunction buildSourcesFooter(citedNumbers, chunks) {\n  if (!citedNumbers.length) return '';\n  const lines = citedNumbers.map((n) => {\n    const c = chunks[n - 1];\n    const heading = Array.isArray(c.heading_path) ? c.heading_path[c.heading_path.length - 1] : headingText(c);\n    return `[${n}] ${heading}: ${c.url}`;\n  });\n  return `\\n\\n📚 Fuentes\\n${lines.join('\\n')}`;\n}\n\n// -----------------------------------------------------------------------------\n// findV4Syntax: sintaxis de Bootstrap 4 dentro de bloques ```code```. Devuelve\n// la lista de coincidencias (para loguear/reintentar), vacía si no hay nada.\n// -----------------------------------------------------------------------------\nfunction findV4Syntax(markdown) {\n  const found = [];\n  const re = /```[\\w-]*\\n([\\s\\S]*?)```/g;\n  let m;\n  while ((m = re.exec(markdown))) {\n    const code = m[1];\n    for (const p of V4_PATTERNS) {\n      const hit = code.match(p);\n      if (hit) found.push(hit[0]);\n    }\n  }\n  return [...new Set(found)];\n}\n\n// -----------------------------------------------------------------------------\n// splitMarkdown: divide en partes ≤ PART_LIMIT caracteres, cortando solo entre\n// bloques (líneas en blanco), nunca a mitad de un ``` ... ``` ni de una cita\n// [n] (que siempre es corta, así que cae entera en un lado u otro igual).\n// -----------------------------------------------------------------------------\nfunction splitMarkdown(markdown, limit = PART_LIMIT) {\n  if (markdown.length <= limit) return [markdown];\n\n  // Bloques = párrafos y bloques de código completos, separados por \\n\\n.\n  const blocks = [];\n  const re = /```[\\w-]*\\n[\\s\\S]*?```|[^\\n]+(?:\\n(?!\\n)[^\\n]+)*/g;\n  let m;\n  let lastIndex = 0;\n  while ((m = re.exec(markdown))) {\n    blocks.push(m[0]);\n    lastIndex = re.lastIndex;\n  }\n  if (lastIndex < markdown.length) blocks.push(markdown.slice(lastIndex).trim());\n\n  const parts = [];\n  let cur = '';\n  for (const block of blocks) {\n    const candidate = cur ? `${cur}\\n\\n${block}` : block;\n    if (candidate.length > limit && cur) {\n      parts.push(cur);\n      cur = block;\n    } else if (candidate.length > limit) {\n      // un solo bloque más grande que el límite: corte duro por líneas.\n      let rest = block;\n      while (rest.length > limit) {\n        parts.push(rest.slice(0, limit));\n        rest = rest.slice(limit);\n      }\n      cur = rest;\n    } else {\n      cur = candidate;\n    }\n  }\n  if (cur) parts.push(cur);\n  return parts;\n}\n\n// -----------------------------------------------------------------------------\n// markdownToTelegramHtml: subconjunto de Markdown -> HTML permitido por\n// Telegram (b, code, pre, a). Todo lo demás se escapa. citationMap: número\n// de cita -> URL (o null si es inválida, en cuyo caso se borra la cita).\n// -----------------------------------------------------------------------------\nfunction markdownToTelegramHtml(markdown, citationMap = {}) {\n  let out = '';\n  const fenceRe = /```([\\w-]*)\\n([\\s\\S]*?)```/g;\n  let last = 0;\n  let m;\n  while ((m = fenceRe.exec(markdown))) {\n    out += convertInline(markdown.slice(last, m.index), citationMap);\n    const lang = m[1];\n    const code = escapeHtml(m[2].replace(/\\n$/, ''));\n    out += lang\n      ? `<pre><code class=\"language-${escapeHtml(lang)}\">${code}</code></pre>`\n      : `<pre>${code}</pre>`;\n    last = fenceRe.lastIndex;\n  }\n  out += convertInline(markdown.slice(last), citationMap);\n  return out.trim();\n}\n\n// El código en línea se separa primero: negrita y citas se aplican solo fuera\n// de él. Telegram no admite etiquetas dentro de <code>, y un `[1]` o `**x**`\n// dentro de código es literal.\nfunction convertInline(text, citationMap) {\n  return escapeHtml(text)\n    .split('\\n')\n    .map((line) => {\n      const l = line.replace(/^(\\s*)[-*]\\s+/, '$1• ');\n      return l.split(/(`[^`\\n]+`)/g).map((seg) => {\n        if (/^`[^`]+`$/.test(seg)) return `<code>${seg.slice(1, -1)}</code>`;\n        return seg\n          .replace(/\\*\\*(.+?)\\*\\*/g, '<b>$1</b>')\n          // cursiva *texto*: el asterisco no puede ir pegado a un espacio por\n          // dentro, para no tocar un \"5 * 3\" suelto.\n          .replace(/(^|[^\\w*])\\*(?!\\s)([^*\\n]+?)(?<!\\s)\\*(?![\\w*])/g, '$1<i>$2</i>')\n          .replace(/ ?\\[(\\d+)\\]/g, (full, n) => {\n            const url = citationMap[Number(n)];\n            return url ? `${full.startsWith(' ') ? ' ' : ''}<a href=\"${escapeHtml(url)}\">[${n}]</a>` : '';\n          });\n      }).join('');\n    })\n    .join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// formatAnswer: junta todo lo anterior. chunks = filas de rag/02_buscar.sql en\n// el mismo orden usado en buildContext. Devuelve { parts, citedUrls } listo\n// para enviar (una llamada sendMessage por parte, en orden).\n// -----------------------------------------------------------------------------\nfunction formatAnswer(rawMarkdown, chunks) {\n  const markdown = normalizeCitations(rawMarkdown);\n  const cited = extractCitations(markdown, chunks.length);\n  // Si el LLM no citó nada, se usan los 2 fragmentos más similares (ya vienen\n  // ordenados por similarity desc desde rag/02_buscar.sql) para cumplir la\n  // regla de \"citar siempre\".\n  const citedOrFallback = cited.length ? cited : chunks.slice(0, 2).map((_, i) => i + 1);\n\n  const citationMap = {};\n  for (const n of citedOrFallback) citationMap[n] = chunks[n - 1]?.url || null;\n\n  const footer = buildSourcesFooter(citedOrFallback, chunks);\n  const full = markdown + footer;\n\n  const mdParts = splitMarkdown(full, PART_LIMIT);\n  const parts = mdParts.map((p) => markdownToTelegramHtml(p, citationMap)).filter((p) => p.length);\n\n  const citedUrls = [...new Set(citedOrFallback.map((n) => chunks[n - 1]?.url).filter(Boolean))];\n  return { parts, citedUrls };\n}\n\n// Guardado así (y no `module.exports = …` a secas) porque este archivo se\n// copia entero dentro de los nodos Code de n8n (mismo patrón que chunker.js):\n// ahí no existe `module`, y sin el guard lanzaría ReferenceError.\nif (typeof module !== 'undefined') module.exports = {\n  TELEGRAM_MAX, PART_LIMIT, V4_PATTERNS,\n  NOT_IN_DOCS, isNotInDocs, rewriteResult,\n  buildContext, llmText, llmTokens, llmFinishReason, escapeHtml, htmlToPlain, normalizeCitations, extractCitations,\n  buildSourcesFooter, findV4Syntax, splitMarkdown, markdownToTelegramHtml,\n  convertInline, formatAnswer,\n};\n\n// =============================================================================\n// estudio-lib.js — Funciones puras de la Fase 5: [BS] Lección del día,\n// [BS] Progreso y [BS] Envío diario. Probadas con scripts/test-estudio-lib.js\n// y copiadas a los nodos Code por scripts/build-estudio.js.\n//\n// Reutiliza rag-lib.js (markdown → HTML de Telegram y el detector de sintaxis\n// de Bootstrap 4). En Node se importa; en n8n el build pega rag-lib.js ANTES de\n// este archivo, así que sus funciones ya existen como globales.\n// =============================================================================\n\nconst ragLib = typeof findV4Syntax === 'function'\n  ? { markdownToTelegramHtml, findV4Syntax, escapeHtml }\n  : require('./rag-lib');\n\n// Cuánto de la página ve el modelo para escribir la lección. Las páginas\n// grandes (Navbar, Spacing) pasan de 40 000 caracteres; los primeros\n// fragmentos son la introducción y el uso básico, que es lo que va en una\n// lección. ~20 000 caracteres ≈ 5 000 tokens ≈ US$ 0,004 por tema, una vez.\nconst LESSON_SOURCE_CHARS = 20000;\nconst LESSON_MAX_CHARS = 2600;   // el prompt pide 2200; margen antes de rechazar\nconst LESSON_SECTIONS = ['Lo esencial', 'Ejemplo', 'Para recordar'];\n\nconst SECTION_LABEL = {\n  'getting-started': 'Getting started', layout: 'Layout', content: 'Content', forms: 'Forms',\n  components: 'Components', helpers: 'Helpers', utilities: 'Utilities', customize: 'Customize',\n};\n\n// -----------------------------------------------------------------------------\n// Entrada de [BS] Lección del día: del router (/hoy, /saltar, botones) o del\n// envío diario ({ chat_id, text: '/hoy' }).\n//   h:t:<order_index> → test     (\"Ponerme a prueba\")\n//   h:s:<order_index> → saltar   (\"Ya lo sé\")\n//   n:hoy             → hoy      (\"Siguiente lección\")\n// -----------------------------------------------------------------------------\nfunction parseLessonInput({ text, callback_data } = {}) {\n  const cb = String(callback_data ?? '');\n  let m = cb.match(/^h:([ts]):(\\d{1,4})$/);\n  if (m) return { action: m[1] === 't' ? 'test' : 'saltar', topic_order: Number(m[2]) };\n  if (/^\\/saltar\\b/i.test(String(text ?? '').trim())) return { action: 'saltar', topic_order: null };\n  return { action: 'hoy', topic_order: null };\n}\n\n// -----------------------------------------------------------------------------\n// buildLessonPrompt: turno de usuario. errors = motivos del intento anterior.\n// -----------------------------------------------------------------------------\nfunction buildLessonPrompt({ title, section, chunks, errors = [] }) {\n  const parts = [];\n  let used = 0;\n  for (const [i, c] of (chunks ?? []).entries()) {\n    const heading = Array.isArray(c.heading_path) ? c.heading_path.join(' > ') : '';\n    const block = `[${i + 1}] (${heading})\\n${c.content}`;\n    if (used && used + block.length > LESSON_SOURCE_CHARS) break;\n    parts.push(block.slice(0, LESSON_SOURCE_CHARS));\n    used += block.length;\n  }\n  const lines = [\n    `Tema: ${title} (sección ${SECTION_LABEL[section] ?? section} de la documentación de Bootstrap 5.3)`,\n    '',\n    'Fragmentos de la página oficial, en orden:',\n    '',\n    parts.join('\\n\\n---\\n\\n'),\n    '',\n  ];\n  if (errors.length) lines.push('Tu intento anterior fue rechazado por esto; corrígelo:', ...errors.map((e) => `- ${e}`), '');\n  lines.push('Escribe la lección.');\n  return lines.join('\\n');\n}\n\n// -----------------------------------------------------------------------------\n// validateLesson: lista de errores (vacía = válida), redactados para el modelo.\n// lenient (último intento): el largo ya no rechaza si igual cabe en Telegram.\n// -----------------------------------------------------------------------------\nfunction validateLesson(markdown, { lenient = false } = {}) {\n  const md = String(markdown ?? '').trim();\n  const errors = [];\n  if (!md) {\n    errors.push('La respuesta vino vacía.');\n    return errors;\n  }\n  const max = lenient ? 3400 : LESSON_MAX_CHARS;\n  if (md.length > max) errors.push(`La lección tiene ${md.length} caracteres; el máximo es 2200. Acórtala.`);\n  const missing = LESSON_SECTIONS.filter((s) => !md.includes(`**${s}**`));\n  if (missing.length) errors.push(`Faltan las partes en negrita: ${missing.map((s) => `**${s}**`).join(', ')}.`);\n  if (!/```[\\w-]*\\n[\\s\\S]*?```/.test(md)) errors.push('Falta el bloque de código del ejemplo.');\n  // URLs solo fuera del código: dentro sí pueden ir (el <link> del CDN en Introduction).\n  const prose = md.replace(/```[\\w-]*\\n[\\s\\S]*?```/g, '');\n  if (/https?:\\/\\//i.test(prose)) errors.push('No incluyas URLs en el texto: el bot agrega el enlace oficial.');\n  const v4 = ragLib.findV4Syntax(md);\n  if (v4.length) errors.push(`El código tiene sintaxis de Bootstrap 4 (${v4.join(', ')}): usa solo 5.3.`);\n  return errors;\n}\n\n// El modelo a veces envuelve todo en ```markdown … ```: se quita esa envoltura.\nfunction cleanLesson(text) {\n  return String(text ?? '').trim().replace(/^```(?:markdown|md)?\\n([\\s\\S]*)\\n```$/i, '$1').trim();\n}\n\n// -----------------------------------------------------------------------------\n// formatLessonMessage: HTML del mensaje de /hoy. El enlace sale de study_path,\n// nunca del modelo.\n// -----------------------------------------------------------------------------\nfunction formatLessonMessage({ title, url, section, order_index, total, markdown }) {\n  const esc = ragLib.escapeHtml;\n  const head = `📖 <b>Lección del día · ${esc(title)}</b>\\n` +\n    `<i>${esc(SECTION_LABEL[section] ?? section)} · tema ${Number(order_index) + 1} de ${total} de la ruta</i>`;\n  const body = ragLib.markdownToTelegramHtml(markdown);\n  const link = `🔗 <a href=\"${esc(url)}\">Documentación oficial: ${esc(title)}</a>`;\n  return `${head}\\n\\n${body}\\n\\n${link}\\n\\nCuando termines de leer, ponte a prueba: 3 preguntas, apruebas con 2.`;\n}\n\nfunction routeFinishedMessage(total) {\n  return `🎉 <b>¡Terminaste la ruta!</b> Viste los ${total} temas de Bootstrap 5.3.\\n\\n` +\n    'Sigue con /quiz: ahora te pregunta sobre todo de tus temas más débiles y de los repasos que vencen.';\n}\n\nfunction skipMessage({ saltado, siguiente }) {\n  const esc = ragLib.escapeHtml;\n  if (!saltado) return 'No hay tema que saltar: ya terminaste la ruta. 🎉';\n  return `⏭️ Marqué <b>${esc(saltado)}</b> como visto.\\n` +\n    (siguiente ? `Lo siguiente en la ruta: <b>${esc(siguiente)}</b>.` : '¡Con eso terminaste la ruta! 🎉');\n}\n\nfunction reminderMessage(title) {\n  return `⏰ Hoy todavía no hiciste el test de <b>${ragLib.escapeHtml(title)}</b>. ` +\n    'Son 3 preguntas; con 2 aciertos pasas al siguiente tema.';\n}\n\n// -----------------------------------------------------------------------------\n// /hora: \"/hora 10 20\" → horas; \"/hora off\" / \"/hora on\"; \"/hora\" → consultar.\n// -----------------------------------------------------------------------------\nfunction parseHoraCommand(text) {\n  const arg = String(text ?? '').trim().replace(/^\\/hora(@\\w+)?/i, '').trim().toLowerCase();\n  if (!arg) return { hours: null, enabled: null };\n  if (/^(off|no|apagar|desactivar)$/.test(arg)) return { hours: null, enabled: false };\n  if (/^(on|si|sí|activar)$/.test(arg)) return { hours: null, enabled: true };\n  const nums = arg.split(/[\\s,;y]+/).filter(Boolean);\n  if (!nums.every((n) => /^\\d{1,2}$/.test(n))) return { error: true };\n  const hours = [...new Set(nums.map(Number))].sort((a, b) => a - b);\n  if (!hours.length || hours.length > 4 || hours.some((h) => h > 23)) return { error: true };\n  return { hours, enabled: true };\n}\n\nfunction formatHoraReply({ hours, enabled }, { error = false } = {}) {\n  const usage = 'Uso: <code>/hora 10 20</code> (hasta 4 horas, de 0 a 23, hora de Lima), ' +\n    '<code>/hora off</code> para apagar el envío diario y <code>/hora on</code> para encenderlo.';\n  if (error) return `No entendí esas horas. ${usage}`;\n  const fmt = (h) => `${String(h).padStart(2, '0')}:00`;\n  const hs = (hours ?? []).map(Number);\n  if (!enabled) return `🔕 Envío diario apagado. Tus horas guardadas: ${hs.map(fmt).join(' y ')}.\\n\\n${usage}`;\n  const [first, ...rest] = hs;\n  return `⏰ Envío diario: ${hs.map(fmt).join(' y ')} (hora de Lima).\\n` +\n    `• ${fmt(first)}: la lección de /hoy (antes, un repaso si tienes alguno vencido).\\n` +\n    (rest.length ? `• ${rest.map(fmt).join(', ')}: repaso, recordatorio del test o una pregunta de /quiz.\\n` : '') +\n    `\\n${usage}`;\n}\n\n// -----------------------------------------------------------------------------\n// /progreso: gráfico de QuickChart (Chart.js v2) y el texto que lo acompaña.\n// -----------------------------------------------------------------------------\nfunction buildProgressChart(secciones) {\n  const rows = secciones ?? [];\n  const pct = (a, b) => (Number(b) ? Math.round((100 * Number(a)) / Number(b)) : 0);\n  return {\n    type: 'horizontalBar',\n    data: {\n      labels: rows.map((s) => `${SECTION_LABEL[s.section] ?? s.section} (${s.vistos}/${s.temas})`),\n      datasets: [\n        { label: '% de temas vistos', backgroundColor: '#7952b3', data: rows.map((s) => pct(s.vistos, s.temas)) },\n        { label: '% dominados', backgroundColor: '#20c997', data: rows.map((s) => pct(s.dominados, s.temas)) },\n      ],\n    },\n    options: {\n      title: { display: true, text: 'Avance en la ruta de Bootstrap 5.3', fontSize: 18 },\n      legend: { position: 'bottom' },\n      scales: { xAxes: [{ ticks: { min: 0, max: 100, stepSize: 25 } }] },\n      plugins: { datalabels: { display: false } },\n    },\n  };\n}\n\n// Pie de foto de Telegram: máximo 1024 caracteres.\nfunction formatProgressCaption(r) {\n  const esc = ragLib.escapeHtml;\n  const temas = (r.secciones ?? []).reduce((a, s) => a + Number(s.temas), 0);\n  const vistos = (r.secciones ?? []).reduce((a, s) => a + Number(s.vistos), 0);\n  const resp = Number(r.respondidas ?? 0);\n  const acierto = resp ? Math.round((100 * Number(r.aciertos ?? 0)) / resp) : 0;\n  const lines = [\n    `📊 <b>Tu progreso</b>`,\n    `Ruta: ${vistos} de ${temas} temas vistos.`,\n    resp ? `Quiz: ${resp} respuestas, ${acierto} % de acierto.` : 'Quiz: todavía no respondiste preguntas.',\n    r.actual ? `Tema actual: <b>${esc(r.actual)}</b> (/hoy).` : 'Ruta terminada 🎉',\n  ];\n  if (Number(r.vencidos)) lines.push(`🔁 Repasos pendientes: ${r.vencidos} (/quiz los prioriza).`);\n  const deb = r.debiles ?? [];\n  if (deb.length) {\n    lines.push('', '<b>Temas más débiles</b>');\n    deb.forEach((d, i) => lines.push(`${i + 1}. ${esc(d.title)}: ${d.tasa} % (${d.correct}/${Number(d.correct) + Number(d.wrong)})`));\n  } else if (resp) {\n    lines.push('', 'Sin temas débiles por ahora 💪');\n  }\n  return lines.join('\\n').slice(0, 1024);\n}\n\nif (typeof module !== 'undefined') module.exports = {\n  LESSON_SOURCE_CHARS, LESSON_MAX_CHARS, SECTION_LABEL,\n  parseLessonInput, buildLessonPrompt, validateLesson, cleanLesson, formatLessonMessage,\n  routeFinishedMessage, skipMessage, reminderMessage,\n  parseHoraCommand, formatHoraReply, buildProgressChart, formatProgressCaption,\n};\n\n\nconst e = $('Entrada').first().json;\nreturn { json: { chat_id: Number(e.chat_id), dry_run: e.dry_run === true,\n  caption: formatProgressCaption($json),\n  // QuickChart dibuja un config de Chart.js (v2) y devuelve el PNG.\n  qc: { version: '2', backgroundColor: 'white', width: 800, height: 460, format: 'png',\n        chart: buildProgressChart($json.secciones) } } };"
+      }
+    },
+    {
+      "id": "p4",
+      "name": "Gráfico",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.qc) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput",
+      "notes": "POST a QuickChart: la respuesta es la imagen (binario \"data\"). Si falla, se manda solo el texto."
+    },
+    {
+      "id": "p5",
+      "name": "¿dry_run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "p5-c",
+              "leftValue": "={{ $('Armar').first().json.dry_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "p6",
+      "name": "Salida progreso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const a = $('Armar').first().json;\nreturn [{ json: { action: 'progreso', caption: a.caption, chart: a.qc.chart,\n  image_bytes: $input.first().binary?.data?.fileSize ?? null, image_mime: $input.first().binary?.data?.mimeType ?? null } }];"
+      }
+    },
+    {
+      "id": "p7",
+      "name": "Enviar gráfico",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Armar').first().json.chat_id }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ $('Armar').first().json.caption }}",
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "p8",
+      "name": "Enviar texto",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Armar').first().json.chat_id }}",
+        "text": "={{ $('Armar').first().json.caption }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR_TELEGRAM",
+          "name": "Bootstrap_bot"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Plan B si QuickChart no respondió."
+    }
+  ],
+  "connections": {
+    "Entrada": {
+      "main": [
+        [
+          {
+            "node": "Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen": {
+      "main": [
+        [
+          {
+            "node": "Armar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar": {
+      "main": [
+        [
+          {
+            "node": "Gráfico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gráfico": {
+      "main": [
+        [
+          {
+            "node": "¿dry_run?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿dry_run?": {
+      "main": [
+        [
+          {
+            "node": "Salida progreso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar gráfico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Lima"
+  }
+}
