@@ -9,7 +9,7 @@
 -- =============================================================================
 
 WITH p AS (
-  SELECT * FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint, topic_key text, emb text)
+  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, topic_key text, emb text)
 )
 SELECT b.question AS similar_question, b.sim
   FROM p

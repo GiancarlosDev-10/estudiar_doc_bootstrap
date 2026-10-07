@@ -18,7 +18,7 @@
 
 WITH p AS (
   SELECT (x.q::text)::vector AS v
-    FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(q jsonb)
+    FROM jsonb_to_record($1::jsonb) AS x(q jsonb)
 ),
 top AS (
   SELECT c.id, c.content, c.url, c.heading_path, c.topic_key,

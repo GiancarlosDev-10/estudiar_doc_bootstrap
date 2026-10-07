@@ -14,7 +14,7 @@
 
 WITH p AS (
   SELECT x.chat_id, regexp_match(x.data, '^q:([0-9a-f-]{36}):([0-3])$') AS g
-    FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint, data text)
+    FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, data text)
 ),
 antes AS (
   SELECT q.question, q.options, q.format, q.difficulty, q.topic_key, sp.title, q.origin,

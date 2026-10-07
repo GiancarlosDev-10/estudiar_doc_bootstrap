@@ -7,7 +7,7 @@
 
 INSERT INTO lessons (topic_key, markdown, source_hash, model, prompt_tokens, completion_tokens)
 SELECT x.topic_key, x.markdown, x.source_hash, x.model, x.prompt_tokens, x.completion_tokens
-  FROM jsonb_to_record($bsjson$__ROW_JSON__$bsjson$::jsonb) AS x(
+  FROM jsonb_to_record($1::jsonb) AS x(
          topic_key text, markdown text, source_hash text, model text, prompt_tokens int, completion_tokens int)
 ON CONFLICT (topic_key) DO UPDATE
    SET markdown = EXCLUDED.markdown, source_hash = EXCLUDED.source_hash, model = EXCLUDED.model,

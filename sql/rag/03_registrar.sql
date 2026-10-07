@@ -16,7 +16,7 @@ INSERT INTO rag_queries
 SELECT x.chat_id, x.source, x.question, x.search_query, x.outcome, x.answer,
        x.chunk_ids, x.similarities, x.top_similarity, x.cited_urls, x.v4_retry,
        x.model, x.prompt_tokens, x.completion_tokens, x.latency_ms
-  FROM jsonb_to_record($bsjson$__ROW_JSON__$bsjson$::jsonb)
+  FROM jsonb_to_record($1::jsonb)
        AS x(chat_id bigint, source text, question text, search_query text,
             outcome text, answer text, chunk_ids uuid[], similarities real[],
             top_similarity real, cited_urls text[], v4_retry boolean,

@@ -7,7 +7,7 @@
 -- =============================================================================
 
 WITH x AS (
-  SELECT * FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint, hours int[], enabled boolean)
+  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, hours int[], enabled boolean)
 )
 INSERT INTO bot_settings AS s (chat_id, hours, enabled)
 SELECT chat_id, coalesce(hours, '{10,20}'), coalesce(enabled, true) FROM x

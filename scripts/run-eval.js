@@ -23,7 +23,9 @@ const path = require('path');
 const { costUsd, needsManualReview, summarize } = require('./eval-lib');
 
 const root = path.join(__dirname, '..');
-const OUT = path.join(root, 'eval/fase6-resultados.json');
+// EVAL_OUT permite correr dos procesos en paralelo (p. ej. generar y rejuzgar)
+// sin que uno pise el archivo del otro; luego se juntan.
+const OUT = process.env.EVAL_OUT ? path.resolve(process.env.EVAL_OUT) : path.join(root, 'eval/fase6-resultados.json');
 const MODELOS = [
   { provider: 'openai', model: 'gpt-5.4-mini' },
   { provider: 'gemini', model: 'gemini-3.7-flash' },

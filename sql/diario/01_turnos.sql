@@ -20,7 +20,7 @@
 -- =============================================================================
 
 WITH p AS (
-  SELECT * FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(hour int, chat_id bigint)
+  SELECT * FROM jsonb_to_record($1::jsonb) AS x(hour int, chat_id bigint)
 ),
 ahora AS (
   SELECT (now() AT TIME ZONE 'America/Lima') AS t

@@ -26,7 +26,9 @@ const arg = (name, optional = false) => {
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-const LESSON_MODEL = 'gpt-5.4-mini';   // el mismo de la Pregunta libre y del quiz
+// El mismo de la Pregunta libre y del quiz: gpt-4o-mini desde el 2026-10-07
+// (decisión del usuario, por costo; ver build-pregunta.js).
+const LESSON_MODEL = 'gpt-4o-mini';
 const idsFile = arg('ids', true);
 const IDS = { leccion: 'PENDIENTE', progreso: 'PENDIENTE', diario: 'PENDIENTE', generar: 'PENDIENTE',
   ...(idsFile && fs.existsSync(idsFile) ? JSON.parse(fs.readFileSync(idsFile, 'utf8')) : {}) };
@@ -47,14 +49,9 @@ const LESSON_PROMPT = promptBody('prompts/leccion.md');
 // rag-lib va antes: estudio-lib usa su markdownToTelegramHtml y findV4Syntax.
 const LIBS = `${read('scripts/rag-lib.js')}\n${read('scripts/estudio-lib.js')}`;
 
-const sqlExpr = (file, map) => {
-  let sql = read(file);
-  for (const [k, v] of Object.entries(map)) {
-    if (!sql.includes(k)) throw new Error(`${file}: no contiene ${k}`);
-    sql = sql.split(k).join(`{{ ${v} }}`);
-  }
-  return `=${sql}`;
-};
+// El valor viaja como bind parameter real (scripts/sql-node.js):
+// options.queryReplacement, nunca concatenado dentro del texto del SQL.
+const { sqlQuery } = require('./sql-node');
 
 const node = (id, name, type, typeVersion, position, parameters, extra = {}) =>
   ({ id, name, type, typeVersion, position, parameters, ...extra });
@@ -64,9 +61,11 @@ const code = (id, name, position, jsCode, extra = {}, mode = 'runOnceForEachItem
 const libCode = (id, name, position, body, extra = {}) => code(id, name, position, `${LIBS}
 
 ${body}`, extra);
-const postgres = (id, name, position, file, map, notes) =>
-  node(id, name, 'n8n-nodes-base.postgres', 2.7, position,
-    { operation: 'executeQuery', query: sqlExpr(file, map), options: {} }, { credentials: pg, notes });
+const postgres = (id, name, position, file, params, notes, consts) => {
+  const { query, queryReplacement } = sqlQuery(path.join(root, file), params, consts);
+  return node(id, name, 'n8n-nodes-base.postgres', 2.7, position,
+    { operation: 'executeQuery', query, options: queryReplacement ? { queryReplacement } : {} }, { credentials: pg, notes });
+};
 
 const cond = (id, leftValue, operator, rightValue = '') => ({ id, leftValue, rightValue, operator });
 const ifNode = (id, name, position, conditions, extra = {}, combinator = 'and') =>
@@ -145,7 +144,7 @@ function buildLeccion() {
 
     // --- /hoy ---------------------------------------------------------------
     postgres('h1', 'Tema de hoy', [1100, -300], 'sql/hoy/01_leccion.sql',
-      { __PARAMS_JSON__: `JSON.stringify({ chat_id: ${P}.chat_id })` },
+      [`{ chat_id: ${P}.chat_id }`],
       'Tema actual (current_topic), lección en caché si los fragmentos no cambiaron y registro del chat en bot_settings.'),
 
     libCode('h2', 'Armar lección', [1320, -300], `// Corre una vez, o de nuevo desde "¿Reintentar?" si la validación rechazó la
@@ -214,10 +213,10 @@ return { json: { ...state, outcome: 'error',
 
     ifNode('h9', '¿Guardar?', [2640, -300], [cond('h9-c', '={{ $json.save === true }}', IS_TRUE)]),
 
-    postgres('h10', 'Guardar lección', [2860, -400], 'sql/hoy/02_guardar.sql', {
-      __ROW_JSON__: `JSON.stringify({ topic_key: ${R}.topic_key, markdown: ${R}.markdown, source_hash: ${R}.source_hash,
-  model: ${R}.model, prompt_tokens: ${R}.prompt_tokens, completion_tokens: ${R}.completion_tokens })`,
-    }, 'Caché: la próxima vez que toque este tema no se llama al modelo.'),
+    postgres('h10', 'Guardar lección', [2860, -400], 'sql/hoy/02_guardar.sql',
+      [`{ topic_key: ${R}.topic_key, markdown: ${R}.markdown, source_hash: ${R}.source_hash,
+  model: ${R}.model, prompt_tokens: ${R}.prompt_tokens, completion_tokens: ${R}.completion_tokens }`],
+      'Caché: la próxima vez que toque este tema no se llama al modelo.'),
 
     ifNode('h11', '¿dry_run lección?', [3080, -300], [cond('h11-c', `={{ ${R}.dry_run }}`, IS_TRUE)]),
 
@@ -239,7 +238,7 @@ return [{ json: { action: 'hoy', outcome: r.outcome, topic_key: r.topic_key ?? n
 
     // --- "Ponerme a prueba" -------------------------------------------------
     postgres('t1', 'Empezar test', [1100, 0], 'sql/hoy/03_test.sql',
-      { __PARAMS_JSON__: `JSON.stringify({ chat_id: ${P}.chat_id, topic_order: ${P}.topic_order, message_id: ${P}.message_id })` },
+      [`{ chat_id: ${P}.chat_id, topic_order: ${P}.topic_order, message_id: ${P}.message_id }`],
       'start_lesson_test: un intento nuevo; un doble toque devuelve duplicate y no genera otra pregunta.'),
 
     code('t2', 'Pedir pregunta 1', [1320, 0], `const base = ${P};
@@ -262,7 +261,7 @@ return { json: { chat_id: base.chat_id, dry_run: base.dry_run, status: r.status 
 
     // --- "Ya lo sé" / /saltar ------------------------------------------------
     postgres('s1', 'Saltar tema', [1100, 300], 'sql/hoy/04_saltar.sql',
-      { __PARAMS_JSON__: `JSON.stringify({ chat_id: ${P}.chat_id, topic_order: ${P}.topic_order })` },
+      [`{ chat_id: ${P}.chat_id, topic_order: ${P}.topic_order }`],
       'Marca el tema como visto (passed_by = saltar) y devuelve el siguiente de la ruta.'),
 
     libCode('s2', 'Mensaje saltar', [1320, 300], `const base = ${P};
@@ -324,7 +323,7 @@ function buildProgreso() {
       { notes: 'Del router: /progreso. De [BS] Test Estudio: { chat_id: 0, dry_run: true }.' }),
 
     postgres('p2', 'Resumen', [220, 0], 'sql/progreso/01_resumen.sql',
-      { __PARAMS_JSON__: 'JSON.stringify({ chat_id: Number($json.chat_id) })' },
+      ['{ chat_id: Number($json.chat_id) }'],
       'Una fila: avance por sección, totales, 3 temas débiles, tema actual y repasos vencidos.'),
 
     libCode('p3', 'Armar', [440, 0], `const e = $('Entrada').first().json;
@@ -390,7 +389,7 @@ function buildDiario() {
     { notes: 'Desde el Schedule: hora real y todos los chats. Desde el arnés: una hora y un chat fijos.' }),
 
     postgres('d5', 'Turnos de esta hora', [660, 0], 'sql/diario/01_turnos.sql',
-      { __PARAMS_JSON__: "JSON.stringify({ hour: $json.hour, chat_id: $json.chat_id })" },
+      ['{ hour: $json.hour, chat_id: $json.chat_id }'],
       'Una fila por chat al que le toca un envío ahora; schedule_runs impide repetir el turno. 0 filas = nada que hacer.'),
 
     switchNode('d6', 'Qué enviar', [880, 0], [
@@ -420,7 +419,7 @@ function buildDiario() {
     libCode('d14', 'Leer horario', [440, 300], `return { json: { chat_id: Number($json.chat_id), dry_run: $json.dry_run === true, ...parseHoraCommand($json.text) } };`),
     ifNode('d15', '¿Horas válidas?', [660, 300], [cond('d15-c', '={{ $json.error === true }}', { type: 'boolean', operation: 'false', singleValue: true })]),
     postgres('d16', 'Guardar horario', [880, 240], 'sql/diario/02_hora.sql',
-      { __PARAMS_JSON__: "JSON.stringify({ chat_id: $json.chat_id, hours: $json.hours, enabled: $json.enabled })" },
+      ['{ chat_id: $json.chat_id, hours: $json.hours, enabled: $json.enabled }'],
       'NULL = no cambiar; sin argumentos solo consulta.'),
     libCode('d17', 'Respuesta horario', [1100, 300], `const p = $('Leer horario').first().json;
 return { json: { chat_id: p.chat_id, dry_run: p.dry_run, action: 'hora',

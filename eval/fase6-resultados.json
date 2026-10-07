@@ -1,5 +1,5 @@
 {
- "fecha": "2026-10-06",
+ "fecha": "2026-10-07",
  "modelos": [
   {
    "provider": "openai",
@@ -12,6 +12,10 @@
   {
    "provider": "gemini",
    "model": "gemini-3.5-flash"
+  },
+  {
+   "provider": "openai",
+   "model": "gpt-4o-mini"
   }
  ],
  "jueces": {
@@ -19,11 +23,11 @@
   "gemini": "gemini-3.8-flash"
  },
  "fragmentos_distintos_en": [],
- "costo_jueces_usd": 0.03178874999999999,
+ "costo_jueces_usd": 0.0162792,
  "acuerdo_jueces": {
-  "pares": 8,
-  "diferencia_media": 0.375,
-  "iguales": 5
+  "pares": 0,
+  "diferencia_media": 0,
+  "iguales": 0
  },
  "resumen": [
   {
@@ -34,11 +38,11 @@
     "fallos": 6,
     "intentos": 20
    },
-   "nota_media": 3.425,
-   "nota_normal": 4.875,
+   "nota_media": 3.35,
+   "nota_normal": 4.75,
    "nota_trampa_v4": 1.25,
    "nota_fuera": 1.25,
-   "correctas_2": 13,
+   "correctas_2": 12,
    "negativas_ok": 14,
    "v4_en_codigo": 0,
    "fuente_esperada": "11/13",
@@ -55,8 +59,8 @@
     "fallos": 12,
     "intentos": 20
    },
-   "nota_media": 1.875,
-   "nota_normal": 2.7083333333333335,
+   "nota_media": 1.85,
+   "nota_normal": 2.6666666666666665,
    "nota_trampa_v4": 0,
    "nota_fuera": 1.25,
    "correctas_2": 6,
@@ -69,6 +73,27 @@
    "tokens_salida_media": 227.75
   },
   {
+   "model": "gpt-4o-mini",
+   "preguntas": 20,
+   "errores": 0,
+   "disponibilidad": {
+    "fallos": 0,
+    "intentos": 20
+   },
+   "nota_media": 4.85,
+   "nota_normal": 4.75,
+   "nota_trampa_v4": 5,
+   "nota_fuera": 5,
+   "correctas_2": 18,
+   "negativas_ok": 19,
+   "v4_en_codigo": 0,
+   "fuente_esperada": "14/15",
+   "latencia_p50_ms": 2592,
+   "latencia_p90_ms": 4908,
+   "costo_por_pregunta_usd": 0.000483735,
+   "tokens_salida_media": 156.15
+  },
+  {
    "model": "gpt-5.4-mini",
    "preguntas": 20,
    "errores": 0,
@@ -76,11 +101,11 @@
     "fallos": 0,
     "intentos": 20
    },
-   "nota_media": 4.475,
-   "nota_normal": 4.541666666666667,
-   "nota_trampa_v4": 3.75,
+   "nota_media": 4.6,
+   "nota_normal": 4.5,
+   "nota_trampa_v4": 4.5,
    "nota_fuera": 5,
-   "correctas_2": 15,
+   "correctas_2": 16,
    "negativas_ok": 20,
    "v4_en_codigo": 0,
    "fuente_esperada": "14/16",
@@ -141,18 +166,18 @@
    },
    "jueces": [
     {
-     "correcta": 2,
-     "sin_errores": 2,
+     "correcta": 1,
+     "sin_errores": 1,
      "util": 1,
-     "total": 5,
-     "motivo": "Responde correctamente con `.mx-auto` en un bloque con ancho definido y también muestra un caso con `justify-content-center` en un contenedor flex de Bootstrap. Aunque añade alternativas extra y no da el ejemplo general `d-flex justify-content-center`, no contiene errores de fondo y es práctico."
+     "total": 3,
+     "motivo": "La respuesta explica correctamente cómo centrar un div, pero se extiende demasiado y menciona opciones que no son necesarias para la pregunta, como el centrado absoluto y espaciadores en stacks, lo que puede generar confusión. Se cumplió con los puntos solicitados, pero la extensión y el contenido adicional no fueron muy útiles."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1085,
-     "completion": 604
+     "prompt": 1086,
+     "completion": 88
     },
     {
      "prompt": 0,
@@ -163,10 +188,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 5,
+   "nota": 3,
    "cost_usd": 0.007803,
-   "juez_cost_usd": 0.0005251499999999999,
-   "revisar": []
+   "juez_cost_usd": 0.00021569999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 1,
@@ -217,18 +246,18 @@
    },
    "jueces": [
     {
-     "correcta": 1,
+     "correcta": 2,
      "sin_errores": 2,
      "util": 1,
-     "total": 4,
-     "motivo": "La respuesta da correctamente la opción principal con `mx-auto` y ancho definido, pero no cubre la alternativa esencial de flexbox en el padre con `d-flex justify-content-center`. No contiene clases inventadas ni sintaxis obsoleta, y los ejemplos son prácticos."
+     "total": 5,
+     "motivo": "La respuesta cubre correctamente las formas de centrar un div horizontalmente usando .mx-auto y flexbox con .justify-content-center, además ofrece ejemplos claros de cada método, lo que la hace práctica y útil."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 983,
-     "completion": 533
+     "prompt": 984,
+     "completion": 64
     },
     {
      "prompt": 0,
@@ -239,9 +268,92 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 4,
+   "nota": 5,
    "cost_usd": 0.0032265,
-   "juez_cost_usd": 0.00046725,
+   "juez_cost_usd": 0.000186,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 1,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo centro un div horizontalmente?",
+   "search_query": "¿Cómo centro un div horizontalmente?",
+   "top_similarity": 0.7195611145205156,
+   "similarities": [
+    0.7195611145205156,
+    0.6624072797762263,
+    0.6609919526064476,
+    0.6486159111905766,
+    0.6381978835930924,
+    0.6365395294923308
+   ],
+   "answer_md": "Puedes centrar un div horizontalmente usando la clase `mx-auto` para contenido de bloque con un ancho definido. Esta clase establece los márgenes horizontales a `auto`, centrándolo en su contenedor.\n\nAquí tienes un ejemplo:\n\n```html\n<div class=\"mx-auto p-2\" style=\"width: 200px;\">\n  Centered element\n</div>\n```\n\nTambién puedes utilizar el sistema de grid de Bootstrap con clases como `justify-content-center` para centrar elementos dentro de una fila. Por ejemplo:\n\n```html\n<div class=\"container\">\n  <div class=\"row justify-content-center\">\n    <div class=\"col-4\">\n      Centered column\n    </div>\n  </div>\n</div>\n```\n\nEsto centra el contenido dentro de la columna en relación con su fila [1][3].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#horizontal",
+    "https://getbootstrap.com/docs/5.3/layout/columns/#horizontal-alignment",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#horizontal-form",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#containers"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2728,
+   "completion_tokens": 171,
+   "latency_ms": 4908,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre correctamente las dos formas de centrar un div horizontalmente en Bootstrap 5.3, proporcionando ejemplos prácticos que ilustran el uso de `mx-auto` y el sistema de grid con `justify-content-center`. No contiene errores ni menciones a clases obsoletas."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 898,
+     "completion": 80
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0005118,
+   "juez_cost_usd": 0.0001827,
    "revisar": []
   },
   {
@@ -297,34 +409,32 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde correctamente con `mx-auto` y aclara que el elemento debe tener ancho definido, incluyendo un ejemplo práctico. No da el ejemplo completo con `d-flex justify-content-center`, pero para la pregunta basta con el método principal válido."
+     "motivo": "La respuesta cubre correctamente cómo centrar un div horizontalmente utilizando la clase .mx-auto y menciona la necesidad de un ancho definido. Además, proporciona un ejemplo claro y relevante, lo que la hace útil y práctica."
     },
-    {
-     "correcta": 2,
-     "sin_errores": 2,
-     "util": 1,
-     "total": 5,
-     "motivo": "Explica con precisión el uso de mx-auto con ancho definido e incluye un ejemplo de código claro y conciso."
-    }
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 863,
-     "completion": 292
+     "prompt": 864,
+     "completion": 66
     },
     {
-     "prompt": 847,
-     "completion": 224
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.00267525,
-   "juez_cost_usd": 0.0017799,
-   "revisar": []
+   "juez_cost_usd": 0.0001692,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 2,
@@ -378,37 +488,35 @@
    "jueces": [
     {
      "correcta": 2,
-     "sin_errores": 1,
-     "util": 1,
-     "total": 4,
-     "motivo": "Cubre todos los elementos esenciales: `navbar-expand-lg`, botón `navbar-toggler` con `data-bs-toggle`/`data-bs-target`, contenedor `.collapse.navbar-collapse` y dropdown con `data-bs-toggle=\"dropdown\"`, además de un ejemplo completo. La nota final sobre iOS y `.dropdown-backdrop` es irrelevante y algo dudosa en Bootstrap 5.3, aunque no afecta al ejemplo principal."
-    },
-    {
-     "correcta": 2,
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre todos los puntos requeridos con precisión, utiliza la sintaxis correcta de Bootstrap 5.3 y aporta un ejemplo de código completo y claro."
-    }
+     "motivo": "La respuesta cubre todos los puntos requeridos sobre la creación de un navbar colapsable con un dropdown, incluye un ejemplo de código completo y correcto, y no contiene información falsa ni irrelevante."
+    },
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 1438,
-     "completion": 633
+     "prompt": 1439,
+     "completion": 62
     },
     {
-     "prompt": 1460,
-     "completion": 394
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "The service is receiving too many requests from you"
    ],
-   "nota": 4.5,
+   "nota": 5,
    "cost_usd": 0.009705,
-   "juez_cost_usd": 0.0031680000000000002,
-   "revisar": []
+   "juez_cost_usd": 0.00025305,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 2,
@@ -464,14 +572,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre todos los puntos esenciales: usa navbar-expand para el breakpoint, navbar-toggler con data-bs-toggle/data-bs-target, collapse navbar-collapse y dropdown con data-bs-toggle=\"dropdown\" y dropdown-menu. El ejemplo HTML es correcto para Bootstrap 5.3 y no usa sintaxis de Bootstrap 4."
+     "motivo": "La respuesta explica claramente cómo crear un navbar responsive en Bootstrap 5.3, cubriendo todos los puntos solicitados, incluyendo el uso de las clases correctas y proporcionando un ejemplo práctico de código HTML."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1351,
-     "completion": 88
+     "prompt": 1352,
+     "completion": 62
     },
     {
      "prompt": 0,
@@ -480,11 +588,95 @@
    ],
    "juez_error": [
     null,
-    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.0040815,
-   "juez_cost_usd": 0.00025545,
+   "juez_cost_usd": 0.00023999999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 2,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "search_query": "¿Cómo hago un navbar que se colapse en móvil y tenga un dropdown?",
+   "top_similarity": 0.7200420951731508,
+   "similarities": [
+    0.7200420951731508,
+    0.714253242516573,
+    0.7016179374122075,
+    0.7013966178349733,
+    0.6943542345401628,
+    0.6938437539805713
+   ],
+   "answer_md": "Para crear un navbar que se colapse en móvil y tenga un dropdown, debes usar varias clases de Bootstrap. A continuación, te explico cómo hacerlo:\n\n1. Usa la clase `.navbar` para envolver todo el contenido del navbar junto con `.navbar-expand-lg` para que se colapse en pantallas más pequeñas (en este caso, debajo del tamaño \"large\").\n2. Incluye un botón de colapso utilizando la clase `.navbar-toggler` que se usará para mostrar y ocultar el contenido del navbar.\n3. Dentro de tu navbar, puedes incluir un elemento `.dropdown` para implementar un menú desplegable con la clase `dropdown-toggle` en el enlace que abre el dropdown y usando `data-bs-toggle=\"dropdown\"` para activar el plugin de dropdown.\n\nAquí tienes un ejemplo de cómo quedaría el código:\n\n```html\n<nav class=\"navbar navbar-expand-lg bg-body-tertiary\">\n    <div class=\"container-fluid\">\n      <a class=\"navbar-brand\" href=\"#\">Navbar</a>\n      <button class=\"navbar-toggler\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#navbarSupportedContent\" aria-controls=\"navbarSupportedContent\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">\n        <span class=\"navbar-toggler-icon\"></span>\n      </button>\n      <div class=\"collapse navbar-collapse\" id=\"navbarSupportedContent\">\n        <ul class=\"navbar-nav me-auto mb-2 mb-lg-0\">\n          <li class=\"nav-item dropdown\">\n            <a class=\"nav-link dropdown-toggle\" data-bs-toggle=\"dropdown\" href=\"#\" role=\"button\" aria-expanded=\"false\">Dropdown</a>\n            <ul class=\"dropdown-menu\">\n              <li><a class=\"dropdown-item\" href=\"#\">Action</a></li>\n              <li><a class=\"dropdown-item\" href=\"#\">Another action</a></li>\n              <li><hr class=\"dropdown-divider\"></li>\n              <li><a class=\"dropdown-item\" href=\"#\">Something else here</a></li>\n            </ul>\n          </li>\n        </ul>\n      </div>\n    </div>\n  </nav>\n```\nRecuerda que el comportamiento de colapso en el navbar está controlado por el plugin de JavaScript de Bootstrap [2][3][4].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/browsers-devices/#navbar-dropdowns",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#responsive-behaviors",
+    "https://getbootstrap.com/docs/5.3/components/navbar/",
+    "https://getbootstrap.com/docs/5.3/components/navbar/#supported-content",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#examples",
+    "https://getbootstrap.com/docs/5.3/components/navs-tabs/#using-dropdowns"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2411,
+   "completion_tokens": 468,
+   "latency_ms": 7121,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta describe correctamente cómo crear un navbar colapsable con un dropdown, abarcando todos los elementos esenciales de la referencia y proporcionando un ejemplo de código funcional. Además, no presenta errores en la sintaxis ni en las clases. Todo se expone de forma clara y práctica."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1282,
+     "completion": 78
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The connection was aborted, perhaps the server is offline"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00064245,
+   "juez_cost_usd": 0.00023909999999999996,
    "revisar": []
   },
   {
@@ -539,37 +731,35 @@
    "jueces": [
     {
      "correcta": 2,
-     "sin_errores": 1,
-     "util": 1,
-     "total": 4,
-     "motivo": "Cubre los elementos esenciales: `navbar-expand-{breakpoint}`, toggler con `data-bs-toggle=\"collapse\"` y `data-bs-target`, `.collapse.navbar-collapse`, y dropdown con `data-bs-toggle=\"dropdown\"`, además de un ejemplo correcto. La nota sobre iOS/`.dropdown-backdrop` es innecesaria y algo imprecisa respecto a Bootstrap 5.3, pero no afecta al código principal."
-    },
-    {
-     "correcta": 2,
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cumple perfectamente con todos los puntos requeridos, utiliza la sintaxis correcta de Bootstrap 5.3 e incluye un ejemplo de código completo y funcional."
-    }
+     "motivo": "La respuesta cubre todos los puntos esenciales requeridos, incluyendo la clase de colapso del navbar, el botón toggler con los atributos correctos y la implementación del dropdown en el navbar. Además, proporciona un ejemplo de código HTML claro y adecuado."
+    },
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 1200,
-     "completion": 505
+     "prompt": 1201,
+     "completion": 72
     },
     {
-     "prompt": 1227,
-     "completion": 322
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
    ],
-   "nota": 4.5,
+   "nota": 5,
    "cost_usd": 0.003558,
-   "juez_cost_usd": 0.00261075,
-   "revisar": []
+   "juez_cost_usd": 0.00022334999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 3,
@@ -626,14 +816,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 4,
-     "motivo": "Indica correctamente que se cambia sobrescribiendo `$primary` en Sass, pero no cubre el orden esencial: importar `functions` antes y hacer la sobrescritura antes de importar `variables`. No contiene el error de recomendar editar `bootstrap.min.css`."
+     "motivo": "La respuesta menciona cómo modificar la variable `$primary`, pero no aclara que esta acción debe hacerse después de importar `functions` y antes de `variables`, y parcialmente informa sobre el uso del mapa `$theme-colors`, lo que no cubre correctamente todos los puntos esenciales."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 963,
-     "completion": 454
+     "prompt": 964,
+     "completion": 77
     },
     {
      "prompt": 0,
@@ -642,12 +832,16 @@
    ],
    "juez_error": [
     null,
-    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+    "The service is receiving too many requests from you"
    ],
    "nota": 4,
    "cost_usd": 0.0073875,
-   "juez_cost_usd": 0.00041684999999999997,
-   "revisar": []
+   "juez_cost_usd": 0.00019079999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 3,
@@ -702,33 +896,110 @@
      "sin_errores": 1,
      "util": 1,
      "total": 3,
-     "motivo": "Indica correctamente que se debe redefinir `$primary` en Sass, pero omite el orden esencial de imports: después de `functions` y antes de `variables`. Además, el ejemplo del mapa `$theme-colors` es incompleto y puede confundir si se copia como override."
+     "motivo": "La respuesta menciona cómo sobrescribir la variable `$primary`, pero no aclara que debe hacerse después de importar `functions` y antes de importar `variables`, que es un detalle importante."
     },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 905,
+     "completion": 59
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 3,
+   "cost_usd": 0.003291,
+   "juez_cost_usd": 0.00017115,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 3,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo cambio el color primary?",
+   "search_query": "¿Cómo cambio el color primary?",
+   "top_similarity": 0.7446582431340633,
+   "similarities": [
+    0.7446582431340633,
+    0.7094911566627383,
+    0.6973720483101166,
+    0.696002250195052,
+    0.6928265235089599,
+    0.6902911378341574
+   ],
+   "answer_md": "Para cambiar el color `primary`, debes modificar la variable `$primary` en tu archivo Sass personalizado. Por ejemplo, puedes hacer lo siguiente:\n\n```scss\n$primary: #0074d9;\n```\n\nLuego, asegúrate de que la variable se asigne en el mapa `$theme-colors` de Bootstrap, como se muestra aquí:\n\n```scss\n$theme-colors: (\n  \"primary\": $primary,\n  \"danger\": $danger\n);\n```\n\nEsto actualizará el color `primary` en toda tu aplicación que utiliza Bootstrap [1][2].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/sass/#modify-map",
+    "https://getbootstrap.com/docs/5.3/customize/color/#theme-colors",
+    "https://getbootstrap.com/docs/5.3/customize/color/",
+    "https://getbootstrap.com/docs/5.3/customize/color/#using-the-new-colors",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#example",
+    "https://getbootstrap.com/docs/5.3/utilities/colors/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3183,
+   "completion_tokens": 116,
+   "latency_ms": 2153,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
     {
      "correcta": 1,
      "sin_errores": 2,
      "util": 1,
      "total": 4,
-     "motivo": "Explica correctamente cómo redefinir la variable $primary en Sass, pero omite el orden de importación clave (después de 'functions' y antes de 'variables')."
-    }
+     "motivo": "La respuesta explica cómo sobrescribir la variable `$primary`, pero no menciona que debe hacerse después de importar `functions` y antes de importar `variables`, lo cual es fundamental en Sass. Además, el uso del mapa `$theme-colors` no es necesario si solo se quiere cambiar `$primary`, lo cual podría ser confuso."
+    },
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 904,
-     "completion": 590
+     "prompt": 847,
+     "completion": 88
     },
     {
-     "prompt": 884,
-     "completion": 347
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
    ],
-   "nota": 3.5,
-   "cost_usd": 0.003291,
-   "juez_cost_usd": 0.0024538499999999996,
+   "nota": 4,
+   "cost_usd": 0.00054705,
+   "juez_cost_usd": 0.00017985,
    "revisar": []
   },
   {
@@ -784,34 +1055,32 @@
      "sin_errores": 2,
      "util": 1,
      "total": 4,
-     "motivo": "Indica correctamente que se cambia sobrescribiendo la variable Sass `$primary` y muestra un ejemplo. Le falta un punto esencial: hacerlo tras importar `functions` y antes de importar `variables` para que Bootstrap lo tome al recompilar."
+     "motivo": "La respuesta menciona cómo modificar la variable `$primary`, pero no indica que debe hacerse después de importar `functions` y antes de importar `variables`, lo cual es un aspecto crucial de la respuesta completa."
     },
-    {
-     "correcta": 1,
-     "sin_errores": 2,
-     "util": 1,
-     "total": 4,
-     "motivo": "Explica correctamente cómo sobrescribir la variable Sass $primary, pero omite indicar el orden de importación crítico (después de functions y antes de variables)."
-    }
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 810,
-     "completion": 178
+     "prompt": 811,
+     "completion": 62
     },
     {
-     "prompt": 785,
-     "completion": 259
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "The service is receiving too many requests from you"
    ],
    "nota": 4,
    "cost_usd": 0.00276,
-   "juez_cost_usd": 0.0017883,
-   "revisar": []
+   "juez_cost_usd": 0.00015884999999999999,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 4,
@@ -865,14 +1134,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Aclara correctamente que `ml-3` y `data-toggle` son de Bootstrap 4 y da los equivalentes de Bootstrap 5.3: `ms-3` y `data-bs-toggle`. No presenta la sintaxis antigua como válida y añade un ejemplo práctico adecuado."
+     "motivo": "La respuesta aclara que ml-3 y data-toggle son de Bootstrap 4, y proporciona correctamente sus equivalentes en 5.3 (ms-3 y data-bs-toggle). Además, incluye un ejemplo práctico y relevante."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1121,
-     "completion": 84
+     "prompt": 1122,
+     "completion": 67
     },
     {
      "prompt": 0,
@@ -881,12 +1150,16 @@
    ],
    "juez_error": [
     null,
-    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.008475,
-   "juez_cost_usd": 0.00021855,
-   "revisar": []
+   "juez_cost_usd": 0.00020849999999999997,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 4,
@@ -959,6 +1232,85 @@
   {
    "id": 4,
    "tipo": "trampa_v4",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "search_query": "¿Cómo uso ml-3 y data-toggle en Bootstrap 5.3?",
+   "top_similarity": 0.7187984678985558,
+   "similarities": [
+    0.7187984678985558,
+    0.7136689080610137,
+    0.7037985347502451,
+    0.7006569064555338,
+    0.6983985531797838,
+    0.6957183584162866
+   ],
+   "answer_md": "Bootstrap 5.3 no usa la sintaxis de Bootstrap 4. En su lugar, el equivalente para `ml-3` es `ms-3` (por el soporte RTL) y `data-toggle` se convierte en `data-bs-toggle`. \n\nPor lo tanto, debes usar:\n\n- `ms-3` en lugar de `ml-3`.\n- `data-bs-toggle` en lugar de `data-toggle`.\n\nPor ejemplo, si deseas aplicar margenes y un toggle, tu código puede verse así:\n\n```html\n<div class=\"ms-3\" data-bs-toggle=\"collapse\" data-bs-target=\"#miElemento\">\n  Toggle Element\n</div>\n```\n\nEsto asegura que estés utilizando las clases y atributos correctos para Bootstrap 5.3 [1][4].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/components/collapse/#via-data-attributes",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#approach",
+    "https://getbootstrap.com/docs/5.3/migration/#utilities-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3223,
+   "completion_tokens": 159,
+   "latency_ms": 3682,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta aclara correctamente que ml-3 y data-toggle son de Bootstrap 4 y proporciona los equivalentes correctos en Bootstrap 5.3. Además, incluye un ejemplo práctico claro y en español, cumpliendo con todos los requisitos establecidos."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 943,
+     "completion": 72
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00057885,
+   "juez_cost_usd": 0.00018465,
+   "revisar": []
+  },
+  {
+   "id": 4,
+   "tipo": "trampa_v4",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -1008,34 +1360,32 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Aclara correctamente que `ml-3` y `data-toggle` son de Bootstrap 4 y da los equivalentes de Bootstrap 5.3: `.ms-3` y `data-bs-toggle`. El ejemplo práctico usa la sintaxis correcta de Bootstrap 5.3."
+     "motivo": "La respuesta aclara correctamente que `ml-3` y `data-toggle` son de Bootstrap 4, y proporciona las equivalencias correctas en Bootstrap 5.3. Además, incluye un ejemplo práctico que ilustra el uso de las nuevas clases y atributos."
     },
-    {
-     "correcta": 2,
-     "sin_errores": 2,
-     "util": 1,
-     "total": 5,
-     "motivo": "Aclara con precisión que ambas sintaxis son de Bootstrap 4, proporciona sus equivalentes en 5.3 (ms-3 y data-bs-toggle) e incluye un ejemplo práctico."
-    }
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 951,
-     "completion": 400
+     "prompt": 952,
+     "completion": 75
     },
     {
-     "prompt": 943,
-     "completion": 374
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.0031815,
-   "juez_cost_usd": 0.0024924,
-   "revisar": []
+   "juez_cost_usd": 0.00018779999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 5,
@@ -1086,14 +1436,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "La respuesta indica claramente que el tema no está cubierto por la documentación de Bootstrap 5.3 y no inventa pasos de integración con Tailwind. Es breve y adecuada para una pregunta fuera de alcance."
+     "motivo": "La respuesta es correcta porque afirma que el tema no está en la documentación de Bootstrap 5.3 y no incluye información innecesaria o inventada sobre la integración."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 720,
-     "completion": 69
+     "prompt": 721,
+     "completion": 55
     },
     {
      "prompt": 0,
@@ -1106,8 +1456,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.005931,
-   "juez_cost_usd": 0.0001494,
-   "revisar": []
+   "juez_cost_usd": 0.00014115,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 5,
@@ -1158,14 +1512,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "La respuesta identifica correctamente que la integración con Tailwind no está cubierta por la documentación de Bootstrap 5.3 y no inventa pasos ni guías externas. Es breve y útil para una pregunta fuera de alcance."
+     "motivo": "La respuesta es correcta y directa, indica claramente que no está en la documentación de Bootstrap 5.3 sin agregar información innecesaria."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 720,
-     "completion": 70
+     "prompt": 721,
+     "completion": 49
     },
     {
      "prompt": 0,
@@ -1178,7 +1532,87 @@
    ],
    "nota": 5,
    "cost_usd": 0.00295575,
-   "juez_cost_usd": 0.00015,
+   "juez_cost_usd": 0.00013754999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 5,
+   "tipo": "fuera",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo integro Bootstrap con Tailwind?",
+   "search_query": "¿Cómo integro Bootstrap con Tailwind?",
+   "top_similarity": 0.6621198029675892,
+   "similarities": [
+    0.6621198029675892,
+    0.6620423135729366,
+    0.6590902568266057,
+    0.6590023209765571,
+    0.6547486891963439,
+    0.6469458165282623
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#usage-with-javascript-frameworks",
+    "https://getbootstrap.com/docs/5.3/getting-started/rtl/#ltr-and-rtl-at-the-same-time",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/",
+    "https://getbootstrap.com/docs/5.3/getting-started/vite/#import-bootstrap",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3560,
+   "completion_tokens": 13,
+   "latency_ms": 2108,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta indica correctamente que el tema no se encuentra en la documentación de Bootstrap 5.3 y no incluye información adicional no solicitada, cumpliendo con todos los requisitos."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 721,
+     "completion": 57
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0005417999999999999,
+   "juez_cost_usd": 0.00014235,
    "revisar": []
   },
   {
@@ -1230,34 +1664,32 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "La respuesta identifica correctamente que la integración con Tailwind no está cubierta por la documentación de Bootstrap 5.3 y no inventa pasos de integración. Es breve y adecuada para una pregunta fuera de alcance."
+     "motivo": "La respuesta es correcta y cubre adecuadamente que el tema no está en la documentación de Bootstrap 5.3, sin proporcionar información adicional innecesaria."
     },
-    {
-     "correcta": 2,
-     "sin_errores": 2,
-     "util": 1,
-     "total": 5,
-     "motivo": "Responde de forma clara y concisa indicando que el tema no forma parte de la documentación de Bootstrap 5.3, sin dar pasos innecesarios sobre Tailwind."
-    }
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 720,
-     "completion": 108
+     "prompt": 721,
+     "completion": 53
     },
     {
-     "prompt": 685,
-     "completion": 267
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.00274125,
-   "juez_cost_usd": 0.0016878000000000002,
-   "revisar": []
+   "juez_cost_usd": 0.00013995,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 6,
@@ -1311,14 +1743,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre exactamente que la `.table` debe envolverse en un contenedor `.table-responsive` y menciona las variantes por breakpoint. No incluye clases inventadas ni errores sobre Bootstrap 5.3, y aporta un ejemplo práctico."
+     "motivo": "La respuesta cubre todos los puntos esenciales: explica correctamente cómo envolver la tabla, menciona las variantes por breakpoint y proporciona un ejemplo práctico. No contiene errores y es directa."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1002,
-     "completion": 194
+     "prompt": 1003,
+     "completion": 56
     },
     {
      "prompt": 0,
@@ -1331,8 +1763,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.005199,
-   "juez_cost_usd": 0.0002667,
-   "revisar": []
+   "juez_cost_usd": 0.00018404999999999997,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 6,
@@ -1386,14 +1822,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre exactamente que la tabla `.table` se envuelve en un `div.table-responsive` y menciona las variantes por breakpoint. No contiene clases inventadas ni errores sobre Bootstrap 5.3, y aporta un ejemplo práctico."
+     "motivo": "La respuesta abarca correctamente cómo hacer una tabla responsive, mencionando el uso de `.table-responsive` y las variantes por breakpoint. Además, incluye un ejemplo práctico, lo cual la hace útil."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 976,
-     "completion": 74
+     "prompt": 977,
+     "completion": 60
     },
     {
      "prompt": 0,
@@ -1406,7 +1842,90 @@
    ],
    "nota": 5,
    "cost_usd": 0.00239025,
-   "juez_cost_usd": 0.0001908,
+   "juez_cost_usd": 0.00018255,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 6,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo hago que una tabla sea responsive?",
+   "search_query": "¿Cómo hago que una tabla sea responsive?",
+   "top_similarity": 0.7700501039699863,
+   "similarities": [
+    0.7700501039699863,
+    0.7451452075421401,
+    0.682462791131216,
+    0.6684117114879607,
+    0.6587966456044999,
+    0.6548271722319144
+   ],
+   "answer_md": "Para hacer que una tabla sea responsive en Bootstrap 5.3, debes envolverla en un contenedor con la clase `table-responsive`. Esto permite que la tabla se desplace horizontalmente en vistas estrechas. Aquí tienes un ejemplo:\n\n```html\n<div class=\"table-responsive\">\n  <table class=\"table\">\n    ...\n  </table>\n</div>\n```\n\nAdemás, si deseas que la tabla sea responsive hasta un breakpoint específico, puedes usar las clases `table-responsive{-sm|-md|-lg|-xl|-xxl}` según necesites [1][2].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/content/tables/#responsive-tables",
+    "https://getbootstrap.com/docs/5.3/content/tables/#always-responsive",
+    "https://getbootstrap.com/docs/5.3/content/tables/#small-tables",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#responsive",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#stacked-to-horizontal",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#tables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1862,
+   "completion_tokens": 116,
+   "latency_ms": 2359,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre de manera clara y precisa cómo hacer que una tabla sea responsive, mencionando la clase adecuada y los breakpoints. Además, incluye un ejemplo que facilita la comprensión."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 853,
+     "completion": 58
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00034889999999999997,
+   "juez_cost_usd": 0.00016275,
    "revisar": []
   },
   {
@@ -1461,14 +1980,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre exactamente lo esencial: envolver la `.table` en un `.table-responsive` y menciona las variantes por breakpoint. No contiene clases inventadas ni errores y aporta un ejemplo práctico de código."
+     "motivo": "La respuesta cubre de manera completa cómo hacer que una tabla sea responsive usando la clase .table-responsive y menciona correctamente las variantes por breakpoint. No contiene errores y es práctica, incluyendo un ejemplo de código."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 824,
-     "completion": 90
+     "prompt": 825,
+     "completion": 63
     },
     {
      "prompt": 0,
@@ -1481,8 +2000,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.00180525,
-   "juez_cost_usd": 0.0001776,
-   "revisar": []
+   "juez_cost_usd": 0.00016155000000000002,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 7,
@@ -1536,14 +2059,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre las clases `.btn-lg` y `.btn-sm`, muestra que se combinan con `.btn` y una variante como `.btn-primary`, y añade correctamente las opciones para grupos y variables CSS. No incluye clases obsoletas ni afirmaciones falsas sobre Bootstrap 5.3."
+     "motivo": "La respuesta cubre adecuadamente las clases para el tamaño de los botones, incluyendo `.btn-lg` y `.btn-sm`, y proporciona ejemplos claros y directos. Además, menciona la posibilidad de personalizar tamaños usando variables CSS, lo que es útil. No incluye ninguna referencia a clases obsoletas, por lo que es completamente válida."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 958,
-     "completion": 85
+     "prompt": 959,
+     "completion": 90
     },
     {
      "prompt": 0,
@@ -1556,8 +2079,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.00723,
-   "juez_cost_usd": 0.0001947,
-   "revisar": []
+   "juez_cost_usd": 0.00019784999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 7,
@@ -1607,18 +2134,18 @@
    },
    "jueces": [
     {
-     "correcta": 2,
+     "correcta": 1,
      "sin_errores": 2,
      "util": 1,
-     "total": 5,
-     "motivo": "Cubre las clases de tamaño `.btn-lg` y `.btn-sm` y muestra que se combinan con `.btn` y una variante como `.btn-primary`. Añade correctamente el caso de grupos de botones sin incluir clases obsoletas o falsas."
+     "total": 4,
+     "motivo": "La respuesta es básicamente correcta al nombrar las clases .btn-lg y .btn-sm. Sin embargo, no menciona que se deben combinar con .btn y una variante de color como se especificó en los puntos que debía cubrir."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 937,
-     "completion": 78
+     "prompt": 938,
+     "completion": 69
     },
     {
      "prompt": 0,
@@ -1629,9 +2156,91 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 5,
+   "nota": 4,
    "cost_usd": 0.00334275,
-   "juez_cost_usd": 0.00018734999999999997,
+   "juez_cost_usd": 0.00018209999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 7,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Qué clases hay para el tamaño de los botones?",
+   "search_query": "¿Qué clases hay para el tamaño de los botones?",
+   "top_similarity": 0.7925659135806596,
+   "similarities": [
+    0.7925659135806596,
+    0.7687708694276686,
+    0.7344081038433768,
+    0.7304523312511471,
+    0.7296191760869307,
+    0.7266024792997811
+   ],
+   "answer_md": "Para el tamaño de los botones en Bootstrap 5.3, puedes usar las siguientes clases:\n\n- `.btn-lg`: para crear botones grandes.\n- `.btn-sm`: para crear botones pequeños.\n\nEstos modificadores se aplican a los botones usando la estructura siguiente:\n\n```html\n<button type=\"button\" class=\"btn btn-primary btn-lg\">Large button</button>\n<button type=\"button\" class=\"btn btn-secondary btn-sm\">Small button</button>\n```\n\nAdemás, puedes personalizar el tamaño de los botones usando variables CSS, como se muestra en el siguiente ejemplo:\n\n```html\n<button type=\"button\" class=\"btn btn-primary\"\n          style=\"--bs-btn-padding-y: .25rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;\">\n    Custom button\n</button>\n```\n\nEstas opciones te permiten adaptar los botones a diferentes necesidades de diseño [1].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sizes",
+    "https://getbootstrap.com/docs/5.3/components/button-group/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/buttons/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/form-control/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/dropdowns/#sizing",
+    "https://getbootstrap.com/docs/5.3/components/modal/#optional-sizes"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2826,
+   "completion_tokens": 187,
+   "latency_ms": 2667,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre adecuadamente las clases `.btn-lg` y `.btn-sm`, proporciona ejemplos claros y también menciona el uso de variables CSS para personalización, cumpliendo así con todos los requisitos de la pregunta."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 924,
+     "completion": 66
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0005361000000000001,
+   "juez_cost_usd": 0.0001782,
    "revisar": []
   },
   {
@@ -1684,17 +2293,17 @@
    "jueces": [
     {
      "correcta": 1,
-     "sin_errores": 2,
+     "sin_errores": 1,
      "util": 1,
-     "total": 4,
-     "motivo": "Responde las clases de tamaño principales `.btn-lg` y `.btn-sm`, pero no cubre que se usan combinadas con `.btn` y una variante como `.btn-primary`. No incluye clases inválidas ni afirmaciones falsas sobre Bootstrap 5.3."
+     "total": 3,
+     "motivo": "La respuesta menciona las clases .btn-lg y .btn-sm, pero no incluye que se combinan con .btn y una variante de color. También introduce información sobre grupos de botones y dropdown buttons que no es relevante para la pregunta principal sobre tamaños de botones."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 826,
-     "completion": 235
+     "prompt": 827,
+     "completion": 74
     },
     {
      "prompt": 0,
@@ -1705,10 +2314,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 4,
+   "nota": 3,
    "cost_usd": 0.00253725,
-   "juez_cost_usd": 0.0002649,
-   "revisar": []
+   "juez_cost_usd": 0.00016845,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 8,
@@ -1763,14 +2376,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde correctamente usando `d-none d-sm-block` y explica que se oculta en `xs` y vuelve a mostrarse desde `sm` en adelante. No contiene clases inválidas ni errores para Bootstrap 5.3, y aporta un ejemplo práctico."
+     "motivo": "La respuesta cubre todo lo que se pregunta al explicar correctamente cómo ocultar un elemento en celulares usando las clases de Bootstrap 5.3. Además, se proporciona un ejemplo práctico que ilustra bien el uso de las clases."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 942,
-     "completion": 80
+     "prompt": 943,
+     "completion": 67
     },
     {
      "prompt": 0,
@@ -1783,8 +2396,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0048045,
-   "juez_cost_usd": 0.0001893,
-   "revisar": []
+   "juez_cost_usd": 0.00018164999999999997,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 8,
@@ -1839,14 +2456,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde correctamente usando `d-none d-sm-block` y explica que se oculta en `xs` y vuelve a mostrarse desde `sm` en adelante. Incluye un ejemplo práctico y no usa clases obsoletas o inexistentes."
+     "motivo": "La respuesta cubre de manera correcta la forma de ocultar el elemento en dispositivos móviles usando las clases adecuadas de Bootstrap 5.3. Además, explica claramente en qué ancho deja de estar oculto y proporciona un ejemplo práctico."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 890,
-     "completion": 109
+     "prompt": 891,
+     "completion": 68
     },
     {
      "prompt": 0,
@@ -1859,7 +2476,89 @@
    ],
    "nota": 5,
    "cost_usd": 0.002058,
-   "juez_cost_usd": 0.00019889999999999998,
+   "juez_cost_usd": 0.00017444999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 8,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo oculto un elemento solo en celulares?",
+   "search_query": "¿Cómo oculto un elemento solo en celulares?",
+   "top_similarity": 0.729884260345331,
+   "similarities": [
+    0.729884260345331,
+    0.6611476717865391,
+    0.6578956842422906,
+    0.656497471211574,
+    0.6550091473782782,
+    0.65264860204102
+   ],
+   "answer_md": "Para ocultar un elemento solo en celulares, puedes usar la clase `d-sm-none`. Esta clase oculta el elemento en pantallas pequeñas (xs) y es visible en pantallas más grandes (sm y superiores) [1]. \n\nAquí tienes un ejemplo:\n\n```html\n<div class=\"d-sm-none\">Este texto está oculto en celulares.</div>\n```\n\nRecuerda que, para mostrar el elemento en pantallas más grandes, puedes combinar la clase con `d-sm-block` o alguna clase similar.",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/utilities/display/#hiding-elements",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/#viewport-meta",
+    "https://getbootstrap.com/docs/5.3/extend/approach/#responsive",
+    "https://getbootstrap.com/docs/5.3/content/reboot/#html5-hidden-attribute",
+    "https://getbootstrap.com/docs/5.3/utilities/display/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/layout/utilities/#toggle-visibility"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1857,
+   "completion_tokens": 104,
+   "latency_ms": 2727,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 1,
+     "sin_errores": 1,
+     "util": 1,
+     "total": 3,
+     "motivo": "La respuesta menciona `d-sm-none`, que es incorrecto si 'celular' incluye sm; debió ser `d-none d-sm-block`. Además, no explica en qué ancho deja de estar oculto."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 860,
+     "completion": 65
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 3,
+   "cost_usd": 0.00034094999999999997,
+   "juez_cost_usd": 0.000168,
    "revisar": []
   },
   {
@@ -1910,17 +2609,17 @@
    "jueces": [
     {
      "correcta": 2,
-     "sin_errores": 1,
+     "sin_errores": 2,
      "util": 1,
-     "total": 4,
-     "motivo": "Da el patrón correcto `d-none d-sm-block` y explica que se muestra desde `sm` en adelante, con ejemplo práctico. Tiene una imprecisión al decir que corresponde a “Visible only on sm”, porque en realidad queda visible desde `sm` hacia arriba, no solo en `sm`."
+     "total": 5,
+     "motivo": "La respuesta explica correctamente cómo ocultar un elemento solo en celulares usando las clases `d-none` y `d-sm-block`, y aclara el ancho a partir del cual el elemento deja de estar oculto. También incluye un ejemplo de código claro y relevante."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 875,
-     "completion": 381
+     "prompt": 876,
+     "completion": 73
     },
     {
      "prompt": 0,
@@ -1931,10 +2630,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 4,
+   "nota": 5,
    "cost_usd": 0.0019455,
-   "juez_cost_usd": 0.00035985000000000005,
-   "revisar": []
+   "juez_cost_usd": 0.00017519999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 9,
@@ -1989,14 +2692,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde correctamente: indica `data-bs-theme=\"dark\"` en `<html>` para modo oscuro global y que también puede aplicarse localmente a componentes o elementos. No inventa clases ni usa sintaxis incorrecta, y aporta un ejemplo práctico."
+     "motivo": "La respuesta cubre adecuadamente cómo activar el modo oscuro en Bootstrap 5.3, mencionando el uso de `data-bs-theme=\"dark\"` en el elemento `<html>` y también la posibilidad de aplicarlo a elementos individuales. Además, proporciona un ejemplo práctico de código HTML para ilustrar la respuesta."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1139,
-     "completion": 277
+     "prompt": 1140,
+     "completion": 84
     },
     {
      "prompt": 0,
@@ -2009,8 +2712,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0072585,
-   "juez_cost_usd": 0.00033705,
-   "revisar": []
+   "juez_cost_usd": 0.00022140000000000001,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 9,
@@ -2083,6 +2790,84 @@
   {
    "id": 9,
    "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo activo el modo oscuro?",
+   "search_query": "¿Cómo activo el modo oscuro?",
+   "top_similarity": 0.7272367043951701,
+   "similarities": [
+    0.7272367043951701,
+    0.7090185013468883,
+    0.6987710171305641,
+    0.6859075138641231,
+    0.6818664480369148,
+    0.6795439529148097
+   ],
+   "answer_md": "Para activar el modo oscuro en tu proyecto, debes añadir el atributo `data-bs-theme=\"dark\"` al elemento `<html>`. Esto aplicará el modo oscuro a todos los componentes y elementos, a menos que tengan un atributo `data-bs-theme` específico aplicado [1].\n\nAquí tienes un ejemplo de cómo se vería:\n\n```html\n<!doctype html>\n<html lang=\"en\" data-bs-theme=\"dark\">\n  <head>\n    <meta charset=\"utf-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>Bootstrap demo</title>\n    <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB\" crossorigin=\"anonymous\">\n  </head>\n  <body>\n    <h1>Hello, world!</h1>\n    <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI\" crossorigin=\"anonymous\"></script>\n  </body>\n</html>\n``` \n\nAsí, podrás implementar el modo oscuro en tu sitio utilizando Bootstrap 5.3.",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#enable-dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#dark-mode",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#building-with-sass",
+    "https://getbootstrap.com/docs/5.3/components/close-button/#dark-variant",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#sass-variables"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2069,
+   "completion_tokens": 333,
+   "latency_ms": 4112,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre perfectamente la forma de activar el modo oscuro utilizando `data-bs-theme=\"dark\"` en `<html>`. Además, aclara que puede haber atributos específicos en componentes, lo cual es relevante. El ejemplo de código es claro y práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1089,
+     "completion": 73
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00051015,
+   "juez_cost_usd": 0.00020714999999999997,
+   "revisar": []
+  },
+  {
+   "id": 9,
+   "tipo": "normal",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -2131,17 +2916,17 @@
    "jueces": [
     {
      "correcta": 2,
-     "sin_errores": 2,
+     "sin_errores": 1,
      "util": 1,
-     "total": 5,
-     "motivo": "Cubre lo esencial: `data-bs-theme=\"dark\"` en `<html>` para modo global y también en elementos/componentes concretos. No inventa clases ni usa sintaxis incorrecta; añade detalles de Sass válidos aunque algo accesorios."
+     "total": 4,
+     "motivo": "La respuesta cubre correctamente cómo activar el modo oscuro en Bootstrap 5.3, mencionando el uso de `data-bs-theme=\"dark\"` en `<html>` y en elementos específicos. Sin embargo, contiene información que no es necesaria sobre Sass y mixin, lo que le quita algo de utilidad."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 921,
-     "completion": 312
+     "prompt": 922,
+     "completion": 84
     },
     {
      "prompt": 0,
@@ -2152,10 +2937,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 5,
+   "nota": 4,
    "cost_usd": 0.0023115,
-   "juez_cost_usd": 0.00032535,
-   "revisar": []
+   "juez_cost_usd": 0.00018869999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 10,
@@ -2210,14 +2999,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde directamente con `.row` y dos `.col` sin número, explicando que el espacio se reparte por igual en todos los breakpoints. Incluye un ejemplo práctico válido para Bootstrap 5.3 y no contiene sintaxis obsoleta."
+     "motivo": "La respuesta cubre completamente lo solicitado, explicando cómo usar las clases `col` sin número dentro de una `row`, y aclara que se reparten el ancho por igual. Además, proporciona un ejemplo práctico que facilita la comprensión."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 899,
-     "completion": 100
+     "prompt": 900,
+     "completion": 69
     },
     {
      "prompt": 0,
@@ -2230,8 +3019,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.004917,
-   "juez_cost_usd": 0.00019485,
-   "revisar": []
+   "juez_cost_usd": 0.0001764,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 10,
@@ -2285,14 +3078,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde exactamente con una `.row` que contiene dos `.col` sin número y explica que se reparten el ancho disponible por igual en todos los tamaños. El ejemplo es correcto para Bootstrap 5.3 y no usa sintaxis inválida."
+     "motivo": "La respuesta cubre lo esencial al mencionar el uso de .row y .col, y explica correctamente que se reparten el ancho de forma equitativa. Además, proporciona un ejemplo práctico que ilustra claramente el concepto."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 856,
-     "completion": 129
+     "prompt": 857,
+     "completion": 66
     },
     {
      "prompt": 0,
@@ -2305,7 +3098,89 @@
    ],
    "nota": 5,
    "cost_usd": 0.00214725,
-   "juez_cost_usd": 0.00020580000000000002,
+   "juez_cost_usd": 0.00016814999999999997,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
+  },
+  {
+   "id": 10,
+   "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo pongo dos columnas del mismo ancho?",
+   "search_query": "¿Cómo pongo dos columnas del mismo ancho?",
+   "top_similarity": 0.7353190560543978,
+   "similarities": [
+    0.7353190560543978,
+    0.7127316505269982,
+    0.7094227595169391,
+    0.7066723179827921,
+    0.7020658254623613,
+    0.6950136241325224
+   ],
+   "answer_md": "Para poner dos columnas del mismo ancho, puedes utilizar la clase `col` en cada columna. Al usar solo la clase `col`, Bootstrap distribuirá el ancho disponible de manera uniforme entre las columnas dentro de un mismo `row`. Aquí tienes un ejemplo:\n\n```html\n<div class=\"container text-center\">\n    <div class=\"row\">\n      <div class=\"col\">\n        1 de 2\n      </div>\n      <div class=\"col\">\n        2 de 2\n      </div>\n    </div>\n  </div>\n```\n\nEste código crea dos columnas que ocupan el mismo espacio en un contenedor [1].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/grid/#auto-layout-columns",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#setting-one-column-width",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#variable-width-content",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#column-sizing",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#example-usage",
+    "https://getbootstrap.com/docs/5.3/layout/grid/#all-breakpoints"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2044,
+   "completion_tokens": 132,
+   "latency_ms": 2592,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": false
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta explica correctamente cómo crear dos columnas del mismo ancho usando `col` en Bootstrap 5.3, incluyendo el ejemplo de código y la distribución uniforme del ancho."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 850,
+     "completion": 55
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00038579999999999995,
+   "juez_cost_usd": 0.0001605,
    "revisar": []
   },
   {
@@ -2361,14 +3236,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde directamente con `.row` y dos `.col` sin número, explicando que se reparten el ancho por igual. El ejemplo es correcto para Bootstrap 5.3 y no usa sintaxis obsoleta."
+     "motivo": "La respuesta cubre todos los puntos esenciales de la referencia, explicando correctamente cómo usar las columnas y que se reparten el ancho por igual. Además, proporciona un ejemplo claro y conciso en código HTML."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 834,
-     "completion": 95
+     "prompt": 835,
+     "completion": 63
     },
     {
      "prompt": 0,
@@ -2381,8 +3256,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.00206775,
-   "juez_cost_usd": 0.00018209999999999998,
-   "revisar": []
+   "juez_cost_usd": 0.00016305,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 11,
@@ -2438,14 +3317,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre los puntos esenciales: `novalidate`, JavaScript que añade `.was-validated`, mensajes con `.valid-feedback`/`.invalid-feedback` y alternativa de servidor con `.is-valid`/`.is-invalid`. No incluye sintaxis obsoleta ni errores relevantes y aporta ejemplos prácticos."
+     "motivo": "La respuesta cubre todos los aspectos esenciales de la validación de formularios con Bootstrap 5.3, incluyendo el uso de novalidate, was-validated, valid-feedback / invalid-feedback, y is-valid / is-invalid para la validación del servidor. Además, proporciona ejemplos claros y prácticos de código."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1524,
-     "completion": 207
+     "prompt": 1525,
+     "completion": 85
     },
     {
      "prompt": 0,
@@ -2458,8 +3337,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0130095,
-   "juez_cost_usd": 0.00035279999999999996,
-   "revisar": []
+   "juez_cost_usd": 0.00027975,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 11,
@@ -2532,6 +3415,87 @@
   {
    "id": 11,
    "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "search_query": "¿Cómo valido un formulario con los estilos de Bootstrap?",
+   "top_similarity": 0.784152478631365,
+   "similarities": [
+    0.784152478631365,
+    0.7820947949547808,
+    0.7512935693406695,
+    0.7503982930188831,
+    0.7448239922523499,
+    0.7410756349563599
+   ],
+   "answer_md": "Para validar un formulario con los estilos de Bootstrap, necesitas aplicar algunos pasos utilizando la clase `.was-validated` y las clases `.is-invalid` y `.is-valid`. Aquí tienes un resumen de lo que debes hacer:\n\n1. Aplica la clase `.was-validated` al `<form>` después de intentar enviarlo. Esto activa los estilos `:invalid` y `:valid` en los controles del formulario [1].\n2. Usa las clases `.is-invalid` y `.is-valid` en tus campos de formulario para indicar su estado y mostrar mensajes de retroalimentación utilizando `.invalid-feedback` y `.valid-feedback` [4].\n3. Asegúrate de agregar el atributo `novalidate` al `<form>` si deseas utilizar la validación personalizada de Bootstrap y evitar las retroalimentaciones predeterminadas del navegador [2].\n\nAquí tienes un ejemplo básico de un formulario con validación:\n\n```html\n<form class=\"row g-3 needs-validation\" novalidate>\n    <div class=\"col-md-4\">\n      <label for=\"validationCustom01\" class=\"form-label\">First name</label>\n      <input type=\"text\" class=\"form-control\" id=\"validationCustom01\" required>\n      <div class=\"valid-feedback\">\n        Looks good!\n      </div>\n      <div class=\"invalid-feedback\">\n        Please provide a first name.\n      </div>\n    </div>\n    <div class=\"col-12\">\n      <button class=\"btn btn-primary\" type=\"submit\">Submit</button>\n    </div>\n</form>\n``` \n\nAdemás, puedes utilizar JavaScript para prevenir el envío del formulario si hay campos inválidos y añadir la clase `.was-validated`:\n\n```js\n(() => {\n  'use strict'\n  const forms = document.querySelectorAll('.needs-validation')\n  Array.from(forms).forEach(form => {\n    form.addEventListener('submit', event => {\n      if (!form.checkValidity()) {\n        event.preventDefault()\n        event.stopPropagation()\n      }\n      form.classList.add('was-validated')\n    }, false)\n  })\n})()\n``` \n\nEsto aplica los estilos de validación de Bootstrap correctamente y proporciona una buena experiencia al usuario [3].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/validation/#how-it-works",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#custom-styles",
+    "https://getbootstrap.com/docs/5.3/forms/validation/",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#server-side",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#customizing",
+    "https://getbootstrap.com/docs/5.3/forms/validation/#supported-elements"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 3589,
+   "completion_tokens": 454,
+   "latency_ms": 5122,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre todos los puntos solicitados, incluyendo el uso de novalidate, la clase .was-validated y las clases para el feedback. Además, incluye un ejemplo práctico que muestra correctamente cómo implementar la validación en un formulario."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 1246,
+     "completion": 70
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00081075,
+   "juez_cost_usd": 0.0002289,
+   "revisar": []
+  },
+  {
+   "id": 11,
+   "tipo": "normal",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -2580,17 +3544,17 @@
    "jueces": [
     {
      "correcta": 1,
-     "sin_errores": 2,
+     "sin_errores": 1,
      "util": 1,
-     "total": 4,
-     "motivo": "La respuesta cubre `novalidate`, `.was-validated` y las clases `.is-valid`/`.is-invalid`, pero no explica claramente que hay que añadir `.was-validated` con JavaScript al intentar enviar ni muestra ese JS; tampoco menciona `.valid-feedback`. No contiene errores de fondo sobre Bootstrap 5.3 y da un ejemplo práctico, aunque incompleto."
+     "total": 3,
+     "motivo": "La respuesta cubre bien varios puntos, pero no menciona cómo añadir la clase `.was-validated` al formulario al intentar enviarlo, lo que es crucial para la validación. Además, incluye información no requerida sobre `.has-validation`, haciendo que la respuesta sea un poco confusa. Sin embargo, proporciona un buen ejemplo práctico."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1083,
-     "completion": 623
+     "prompt": 1084,
+     "completion": 88
     },
     {
      "prompt": 0,
@@ -2601,10 +3565,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 4,
+   "nota": 3,
    "cost_usd": 0.004014,
-   "juez_cost_usd": 0.00053625,
-   "revisar": []
+   "juez_cost_usd": 0.00021539999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 12,
@@ -2657,14 +3625,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde directamente que se debe agregar `.modal-dialog-centered` al `.modal-dialog` y muestra un ejemplo válido. No incluye soluciones manuales ni errores sobre Bootstrap 5.3."
+     "motivo": "La respuesta cubre completamente lo que se pregunta y menciona correctamente la clase `.modal-dialog-centered`. Además, proporciona un ejemplo claro y práctico que ilustra cómo implementar la solución."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 906,
-     "completion": 98
+     "prompt": 907,
+     "completion": 57
     },
     {
      "prompt": 0,
@@ -2673,12 +3641,16 @@
    ],
    "juez_error": [
     null,
-    "Service unavailable - try again later or consider setting this node to retry automatically (in the node settings)"
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.006363,
-   "juez_cost_usd": 0.0001947,
-   "revisar": []
+   "juez_cost_usd": 0.00017024999999999996,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 12,
@@ -2751,6 +3723,84 @@
   {
    "id": 12,
    "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "search_query": "¿Cómo centro un modal verticalmente en la pantalla?",
+   "top_similarity": 0.796331251104921,
+   "similarities": [
+    0.796331251104921,
+    0.6909980730417848,
+    0.6903761710082497,
+    0.6899462527068715,
+    0.6760873593065957,
+    0.6756625948756755
+   ],
+   "answer_md": "Para centrar un modal verticalmente en la pantalla, debes agregar la clase `modal-dialog-centered` a tu elemento `.modal-dialog`. Esto se puede implementar de la siguiente manera:\n\n```html\n<div class=\"modal-dialog modal-dialog-centered\">\n  ...\n</div>\n```\n\nEsto asegurará que el modal se posicione en el centro vertical de la ventana del navegador [1].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#vertically-centered",
+    "https://getbootstrap.com/docs/5.3/components/modal/#dynamic-heights",
+    "https://getbootstrap.com/docs/5.3/utilities/position/#center-elements",
+    "https://getbootstrap.com/docs/5.3/components/modal/#live-demo",
+    "https://getbootstrap.com/docs/5.3/components/modal/#scrolling-long-content",
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2589,
+   "completion_tokens": 76,
+   "latency_ms": 1875,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre adecuadamente lo que se pregunta, explica cómo utilizar la clase `modal-dialog-centered` y proporciona un ejemplo de código práctico. No incluye errores ni propone soluciones fuera de la documentación de Bootstrap 5.3."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 767,
+     "completion": 67
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00043395,
+   "juez_cost_usd": 0.00015525,
+   "revisar": []
+  },
+  {
+   "id": 12,
+   "tipo": "normal",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -2799,34 +3849,32 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Responde exactamente con la clase `.modal-dialog-centered` aplicada a `.modal-dialog` e incluye un ejemplo claro. No contiene errores ni propone CSS manual como solución principal."
+     "motivo": "La respuesta cubre completamente lo que se pregunta, explicando correctamente el uso de `.modal-dialog-centered` y proporcionando ejemplos de código. Además, no contiene errores ni imprecisiones sobre Bootstrap 5.3, y es útil y práctica."
     },
-    {
-     "correcta": 2,
-     "sin_errores": 2,
-     "util": 1,
-     "total": 5,
-     "motivo": "Responde con precisión indicando la clase `.modal-dialog-centered` en `.modal-dialog` e incluye ejemplos de código claros."
-    }
+    null
    ],
    "juez_tokens": [
     {
-     "prompt": 775,
-     "completion": 82
+     "prompt": 776,
+     "completion": 70
     },
     {
-     "prompt": 767,
-     "completion": 263
+     "prompt": 0,
+     "completion": 0
     }
    ],
    "juez_error": [
     null,
-    null
+    "The service is receiving too many requests from you"
    ],
    "nota": 5,
    "cost_usd": 0.0023325,
-   "juez_cost_usd": 0.0017269499999999999,
-   "revisar": []
+   "juez_cost_usd": 0.00015839999999999997,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 13,
@@ -2882,14 +3930,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre lo esencial: explica que los tooltips son opt-in, muestra inicialización con `new bootstrap.Tooltip(...)` y menciona Popper/`bootstrap.bundle`. Añade comprobaciones útiles sin introducir errores de Bootstrap 5.3."
+     "motivo": "La respuesta explica correctamente que los tooltips son opt-in y deben ser inicializados con JavaScript, incluye un ejemplo adecuado de inicialización y menciona la dependencia de Popper. Además, proporciona información útil sobre el atributo title y el uso de elementos deshabilitados."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1127,
-     "completion": 188
+     "prompt": 1128,
+     "completion": 75
     },
     {
      "prompt": 0,
@@ -2902,8 +3950,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0064215,
-   "juez_cost_usd": 0.00028184999999999994,
-   "revisar": []
+   "juez_cost_usd": 0.00021419999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 13,
@@ -2976,6 +4028,85 @@
   {
    "id": 13,
    "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "search_query": "Puse data-bs-toggle=\"tooltip\" y el tooltip no aparece, ¿por qué?",
+   "top_similarity": 0.7583901634157894,
+   "similarities": [
+    0.7583901634157894,
+    0.753958614096146,
+    0.7380249187976234,
+    0.7349231803234105,
+    0.7261627479695268,
+    0.7231768534674765
+   ],
+   "answer_md": "Con la documentación que encontré no puedo responder completamente a tu pregunta, pero puedo ofrecerte información sobre algunos aspectos relevantes.\n\nPrimero, asegúrate de inicializar los tooltips mediante JavaScript, ya que no se activan automáticamente. Debes usar un código similar a este para inicializarlos:\n\n```js\nconst tooltipTriggerList = document.querySelectorAll('[data-bs-toggle=\"tooltip\"]')\nconst tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))\n```\nEsto garantiza que todos los tooltips en tu página se inicialicen correctamente [1].\n\nOtra razón por la cual el tooltip podría no aparecer es que debes asegurarte de que el elemento que usa `data-bs-toggle=\"tooltip\"` no esté `disabled`, ya que los elementos deshabilitados no son interactivos y no activarán el tooltip. Si necesitas mostrar un tooltip para un botón deshabilitado, debes envolverlo en un `<span>` o `<div>` que sea enfocable [4].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#enable-tooltips",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#markup",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#usage",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/#disabled-elements",
+    "https://getbootstrap.com/docs/5.3/components/tooltips/",
+    "https://getbootstrap.com/docs/5.3/getting-started/javascript/#optionally-using-jquery"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2012,
+   "completion_tokens": 206,
+   "latency_ms": 3287,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre completamente los puntos necesarios: menciona que los tooltips son opt-in y que deben ser inicializados con JavaScript, incluye el ejemplo correcto con `new bootstrap.Tooltip(...)` y hace referencia a la necesidad de Popper indirectamente al mostrar cómo inicializar los tooltips. Además, brinda información adicional útil sobre elementos deshabilitados."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 986,
+     "completion": 93
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0004254,
+   "juez_cost_usd": 0.0002037,
+   "revisar": []
+  },
+  {
+   "id": 13,
+   "tipo": "normal",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -3025,17 +4156,17 @@
    "jueces": [
     {
      "correcta": 2,
-     "sin_errores": 1,
+     "sin_errores": 2,
      "util": 1,
-     "total": 4,
-     "motivo": "Cubre lo esencial: explica que los tooltips son opt-in, muestra `new bootstrap.Tooltip(...)` y menciona Popper/`bootstrap.bundle`. Tiene una imprecisión menor al presentar como requisito estricto que el elemento sea interactivo y focusable, cuando es más una recomendación de accesibilidad salvo casos como elementos `disabled`."
+     "total": 5,
+     "motivo": "La respuesta abarca completamente lo que se está preguntando. Explica correctamente que los tooltips deben ser inicializados con JavaScript, proporciona un ejemplo claro de uso y menciona correctamente la necesidad de Popper. Además, destaca otras consideraciones útiles para que el tooltip funcione, lo que la hace práctica."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1060,
-     "completion": 524
+     "prompt": 1061,
+     "completion": 84
     },
     {
      "prompt": 0,
@@ -3046,10 +4177,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 4,
+   "nota": 5,
    "cost_usd": 0.00278175,
-   "juez_cost_usd": 0.00047339999999999996,
-   "revisar": []
+   "juez_cost_usd": 0.00020955000000000002,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 14,
@@ -3102,14 +4237,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre los puntos esenciales: usa `.form-floating`, coloca el `input` antes del `label` y exige un `placeholder` no vacío. No contiene errores sobre Bootstrap 5.3 y aporta un ejemplo claro."
+     "motivo": "La respuesta cubre todos los puntos esenciales solicitados: la envoltura en .form-floating, el orden de input y label, y la obligación del placeholder no vacío. Además, el ejemplo proporcionado es claro y práctico."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 996,
-     "completion": 72
+     "prompt": 997,
+     "completion": 67
     },
     {
      "prompt": 0,
@@ -3122,8 +4257,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0058365,
-   "juez_cost_usd": 0.0001926,
-   "revisar": []
+   "juez_cost_usd": 0.00018974999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 14,
@@ -3196,6 +4335,84 @@
   {
    "id": 14,
    "tipo": "normal",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "search_query": "¿Cómo hago un input con la etiqueta flotante (floating label)?",
+   "top_similarity": 0.7661754604641583,
+   "similarities": [
+    0.7661754604641583,
+    0.7296160321402915,
+    0.7245931702594057,
+    0.7200469208141613,
+    0.7083008723771687,
+    0.7078311526810791
+   ],
+   "answer_md": "Para crear un input con etiqueta flotante (floating label) en Bootstrap 5.3, debes envolver un elemento `<input class=\"form-control\">` y un elemento `<label>` en un contenedor con la clase `.form-floating`. Además, el `<input>` necesita tener un atributo `placeholder` no vacío, ya que el comportamiento de la etiqueta flotante depende de esto.\n\nAquí tienes un ejemplo:\n\n```html\n<div class=\"form-floating mb-3\">\n    <input type=\"email\" class=\"form-control\" id=\"floatingInput\" placeholder=\"name@example.com\">\n    <label for=\"floatingInput\">Email address</label>\n</div>\n```\n\nRecuerda que el `<input>` debe aparecer primero en el HTML para que funcione correctamente con el selector de hermanos (sibling selector) necesario para la implementación. [1]",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#selects",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#input-groups",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#sass-variables",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#readonly-plaintext"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2095,
+   "completion_tokens": 171,
+   "latency_ms": 3785,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta cubre todos los aspectos esenciales, incluyendo el uso de `.form-floating`, el orden de los elementos y la necesidad de un placeholder no vacío. Además, proporciona un ejemplo práctico y claro."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 918,
+     "completion": 61
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00041685,
+   "juez_cost_usd": 0.00017429999999999998,
+   "revisar": []
+  },
+  {
+   "id": 14,
+   "tipo": "normal",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -3244,14 +4461,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cubre exactamente lo esencial: contenedor `.form-floating`, `input.form-control` antes del `label` y `placeholder` no vacío, con un ejemplo correcto. No introduce clases inventadas ni errores sobre Bootstrap 5.3."
+     "motivo": "La respuesta cubre todos los puntos esenciales: la estructura de envoltura de `.form-floating`, el orden correcto del input y el label, y el requisito del placeholder no vacío. Además, incluye un ejemplo práctico, lo cual es muy útil."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 907,
-     "completion": 75
+     "prompt": 908,
+     "completion": 71
     },
     {
      "prompt": 0,
@@ -3264,8 +4481,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0023085,
-   "juez_cost_usd": 0.00018104999999999998,
-   "revisar": []
+   "juez_cost_usd": 0.00017879999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 15,
@@ -3406,6 +4627,84 @@
   {
    "id": 15,
    "tipo": "trampa_v4",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "search_query": "¿Cómo creo un jumbotron en Bootstrap 5.3?",
+   "top_similarity": 0.6919611234759376,
+   "similarities": [
+    0.6919611234759376,
+    0.6877527722280875,
+    0.6873614005662444,
+    0.6852129813871641,
+    0.6825106957568003,
+    0.679162326826496
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/layout/containers/",
+    "https://getbootstrap.com/docs/5.3/migration/#components-2",
+    "https://getbootstrap.com/docs/5.3/migration/#v530-alpha1",
+    "https://getbootstrap.com/docs/5.3/migration/#components-1",
+    "https://getbootstrap.com/docs/5.3/getting-started/introduction/"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 5077,
+   "completion_tokens": 13,
+   "latency_ms": 1955,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": false,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta aclara correctamente que el elemento jumbotron ya no existe en Bootstrap 5.3 y no contiene errores ni información incorrecta. Es una respuesta breve y útil, considerando que se indica que no está presente en la documentación."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 763,
+     "completion": 68
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0007693499999999999,
+   "juez_cost_usd": 0.00015525,
+   "revisar": [
+    "negativa incorrecta pero un juez dio correcta 2"
+   ]
+  },
+  {
+   "id": 15,
+   "tipo": "trampa_v4",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -3450,18 +4749,18 @@
    },
    "jueces": [
     {
-     "correcta": 1,
+     "correcta": 2,
      "sin_errores": 2,
-     "util": 0,
-     "total": 3,
-     "motivo": "Aclara correctamente que `jumbotron` fue eliminado en Bootstrap 5.3, pero no da el equivalente práctico con utilidades como `p-5`, `mb-4`, `bg-body-tertiary` y `rounded-3`. No contiene errores de fondo, pero no responde de forma útil a cómo crearlo."
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta aclara correctamente que el componente `.jumbotron` fue eliminado en Bootstrap 5.3 y menciona que se puede replicar con utilidades, aunque no ofrece un ejemplo específico. Sin embargo, la respuesta es directa y útil."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 807,
-     "completion": 232
+     "prompt": 808,
+     "completion": 70
     },
     {
      "prompt": 0,
@@ -3472,10 +4771,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 3,
+   "nota": 5,
    "cost_usd": 0.0040815,
-   "juez_cost_usd": 0.00026025,
-   "revisar": []
+   "juez_cost_usd": 0.00016319999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 16,
@@ -3616,6 +4919,85 @@
   {
    "id": 16,
    "tipo": "trampa_v4",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "¿Cómo uso form-group y custom-select en un formulario?",
+   "search_query": "¿Cómo uso form-group y custom-select en un formulario?",
+   "top_similarity": 0.7762625358924552,
+   "similarities": [
+    0.7762625358924552,
+    0.7362570893696886,
+    0.7148199249173381,
+    0.7145566513269038,
+    0.7119424019272039,
+    0.7103054924434624
+   ],
+   "answer_md": "Con la documentación que encontré no puedo responder sobre `form-group` porque fue reemplazado por utilidades y clases del grid en Bootstrap 5.3 [6]. También, `custom-select` fue cambiado a `form-select` [6].\n\nPuedes usar `form-select` para crear un menú desplegable personalizado. Aquí tienes un ejemplo de cómo hacerlo dentro de un grupo de entrada:\n\n```html\n<div class=\"input-group mb-3\">\n    <label class=\"input-group-text\" for=\"inputGroupSelect01\">Options</label>\n    <select class=\"form-select\" id=\"inputGroupSelect01\">\n        <option selected>Choose...</option>\n        <option value=\"1\">One</option>\n        <option value=\"2\">Two</option>\n        <option value=\"3\">Three</option>\n    </select>\n</div>\n```\n\nUsa márgenes con utilidades de espacio para estructurar tus formularios, usando clases como `mb-3` [5].",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/migration/#forms-1",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#utilities"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/forms/input-group/#custom-forms",
+    "https://getbootstrap.com/docs/5.3/forms/select/",
+    "https://getbootstrap.com/docs/5.3/forms/select/#sizing",
+    "https://getbootstrap.com/docs/5.3/forms/floating-labels/#layout",
+    "https://getbootstrap.com/docs/5.3/forms/layout/#utilities",
+    "https://getbootstrap.com/docs/5.3/migration/#forms-1"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2590,
+   "completion_tokens": 204,
+   "latency_ms": 2735,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta aclara que `form-group` es de Bootstrap 4 y que ha sido reemplazada por utilidades y clases del grid, además de mencionar que `custom-select` ha cambiado a `form-select`. También incluye un ejemplo práctico y menciona el uso de utilidades. Todo está correcto y es útil."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 970,
+     "completion": 85
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.0005109,
+   "juez_cost_usd": 0.0001965,
+   "revisar": []
+  },
+  {
+   "id": 16,
+   "tipo": "trampa_v4",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -3666,14 +5048,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Aclara correctamente que `form-group` y `custom-select` son de Bootstrap 4 y da los equivalentes de Bootstrap 5.3: utilidades como `mb-3` y `.form-select`. No usa las clases antiguas como válidas y aporta un ejemplo práctico."
+     "motivo": "La respuesta aclara que `form-group` y `custom-select` son de Bootstrap 4 y explica que se reemplazan por utilidades como `mb-3` y `form-select`. También incluye un ejemplo práctico claro y conciso."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 1010,
-     "completion": 85
+     "prompt": 1011,
+     "completion": 70
     },
     {
      "prompt": 0,
@@ -3686,8 +5068,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.00305325,
-   "juez_cost_usd": 0.0002025,
-   "revisar": []
+   "juez_cost_usd": 0.00019365000000000002,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 17,
@@ -3828,6 +5214,84 @@
   {
    "id": 17,
    "tipo": "trampa_v4",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "answered",
+   "question": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "search_query": "Quiero un badge redondeado con badge-pill y alinearlo a la derecha con float-right, ¿cómo?",
+   "top_similarity": 0.764810334202549,
+   "similarities": [
+    0.764810334202549,
+    0.716585933202415,
+    0.6939992442132894,
+    0.6913676055858624,
+    0.6759015288705127,
+    0.6690721917092616
+   ],
+   "answer_md": "Con la documentación que encontré no puedo responder completamente a tu pregunta, ya que no se encuentra la clase `float-right` en Bootstrap 5.3. Sin embargo, puedo indicarte cómo crear un badge redondeado con la clase `rounded-pill`.\n\nPara hacer un badge redondeado, puedes usar la clase `rounded-pill`. Si deseas alinearlo a la derecha, puedes usar utilities de flexbox como `d-flex` y `justify-content-end` en el contenedor.\n\nAquí tienes un ejemplo de cómo hacerlo:\n\n```html\n<div class=\"d-flex justify-content-end\">\n  <span class=\"badge rounded-pill text-bg-primary\">Texto Badge</span>\n</div>\n```\n\nEsto mostrará un badge redondeado alineado a la derecha dentro del contenedor. [1]",
+   "cited_urls": [
+    "https://getbootstrap.com/docs/5.3/components/badge/#pill-badges"
+   ],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/badge/#pill-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#positioned",
+    "https://getbootstrap.com/docs/5.3/components/list-group/#with-badges",
+    "https://getbootstrap.com/docs/5.3/components/badge/#buttons",
+    "https://getbootstrap.com/docs/5.3/components/badge/#headings",
+    "https://getbootstrap.com/docs/5.3/components/badge/#background-colors"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1933,
+   "completion_tokens": 161,
+   "latency_ms": 2346,
+   "auto": {
+    "error": false,
+    "nego": false,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": true,
+    "fuente_esperada": true
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta aclara correctamente que `float-right` no se encuentra en 5.3 y da la clase correcta `rounded-pill`. Además, sugiere el uso de flexbox para alinear el badge, lo cual es útil y práctico."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 917,
+     "completion": 71
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00038654999999999994,
+   "juez_cost_usd": 0.00018015,
+   "revisar": []
+  },
+  {
+   "id": 17,
+   "tipo": "trampa_v4",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "answered",
@@ -3875,16 +5339,16 @@
     {
      "correcta": 1,
      "sin_errores": 1,
-     "util": 0,
-     "total": 2,
-     "motivo": "Aclara que `badge-pill` y `float-right` son de Bootstrap 4 y usa bien `rounded-pill`, pero no da el equivalente requerido `float-end` para Bootstrap 5.3. La alternativa con flex puede funcionar en ese ejemplo, pero no responde directamente cómo sustituir `float-right`."
+     "util": 1,
+     "total": 3,
+     "motivo": "La respuesta acierta al mencionar que `badge-pill` y `float-right` son de Bootstrap 4, y utiliza correctamente `rounded-pill`. Sin embargo, no proporciona información sobre el reemplazo de `float-right` por `float-end`, lo que es importante para una respuesta completa."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 926,
-     "completion": 477
+     "prompt": 927,
+     "completion": 79
     },
     {
      "prompt": 0,
@@ -3895,12 +5359,14 @@
     null,
     "The service is receiving too many requests from you"
    ],
-   "nota": 2,
+   "nota": 3,
    "cost_usd": 0.0022275,
-   "juez_cost_usd": 0.00042510000000000003,
-   "revisar": [
-    "nota baja (2)"
-   ]
+   "juez_cost_usd": 0.00018644999999999998,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 18,
@@ -4041,6 +5507,82 @@
   {
    "id": 18,
    "tipo": "fuera",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo hago un hook personalizado en React?",
+   "search_query": "¿Cómo hago un hook personalizado en React?",
+   "top_similarity": 0.5887571500959335,
+   "similarities": [
+    0.5887571500959335,
+    0.5847492218018243,
+    0.5779538034451454,
+    0.5687515560540611,
+    0.5682709731733648,
+    0.5679546241598018
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/helpers/focus-ring/#example",
+    "https://getbootstrap.com/docs/5.3/customize/components/#creating-your-own",
+    "https://getbootstrap.com/docs/5.3/layout/containers/#sass-mixins",
+    "https://getbootstrap.com/docs/5.3/customize/color-modes/#custom-color-modes",
+    "https://getbootstrap.com/docs/5.3/components/popovers/#custom-popovers",
+    "https://getbootstrap.com/docs/5.3/helpers/stacks/#css"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1927,
+   "completion_tokens": 13,
+   "latency_ms": 1076,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta es correcta y directa, indicando claramente que el tema no está en la documentación de Bootstrap 5.3, cumpliendo así con lo requerido."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 703,
+     "completion": 53
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00029685000000000003,
+   "juez_cost_usd": 0.00013725,
+   "revisar": []
+  },
+  {
+   "id": 18,
+   "tipo": "fuera",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "no_context",
@@ -4087,14 +5629,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "La respuesta identifica correctamente que el tema no está en la documentación de Bootstrap 5.3 y no explica React. Es breve y adecuada para una pregunta fuera de alcance."
+     "motivo": "La respuesta es correcta y concisa, indicando claramente que el tema no está cubierto en la documentación de Bootstrap 5.3. Además, no proporciona información adicional no solicitada sobre cómo hacer un hook de React."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 702,
-     "completion": 103
+     "prompt": 703,
+     "completion": 65
     },
     {
      "prompt": 0,
@@ -4107,8 +5649,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0015165,
-   "juez_cost_usd": 0.0001671,
-   "revisar": []
+   "juez_cost_usd": 0.00014445,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 19,
@@ -4249,6 +5795,82 @@
   {
    "id": 19,
    "tipo": "fuera",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "search_query": "¿Cómo centro un div con CSS Grid puro, sin frameworks?",
+   "top_similarity": 0.6745246877915454,
+   "similarities": [
+    0.6745246877915454,
+    0.6628042657020818,
+    0.6624600078780146,
+    0.6472714965982751,
+    0.6471069613025251,
+    0.6449827839347155
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#no-grid-classes",
+    "https://getbootstrap.com/docs/5.3/utilities/spacing/#horizontal-centering",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#three-columns",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#columns-and-gaps",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#adding-rows",
+    "https://getbootstrap.com/docs/5.3/layout/css-grid/#starts"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 1507,
+   "completion_tokens": 13,
+   "latency_ms": 1315,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta es correcta porque menciona que CSS Grid puro no está en la documentación de Bootstrap 5.3 y no ofrece información adicional que la invalide."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 756,
+     "completion": 53
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00023385,
+   "juez_cost_usd": 0.00014519999999999998,
+   "revisar": []
+  },
+  {
+   "id": 19,
+   "tipo": "fuera",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "no_context",
@@ -4295,14 +5917,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "Cumple con indicar que CSS Grid puro no está en la documentación de Bootstrap 5.3 y no da una receta ajena como si fuera de Bootstrap. Es breve y adecuada para una pregunta fuera de alcance."
+     "motivo": "La respuesta señala correctamente que el CSS Grid puro no está en la documentación de Bootstrap 5.3 y no proporciona ninguna información adicional innecesaria o incorrecta."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 755,
-     "completion": 115
+     "prompt": 756,
+     "completion": 54
     },
     {
      "prompt": 0,
@@ -4315,8 +5937,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.0012015,
-   "juez_cost_usd": 0.00018225,
-   "revisar": []
+   "juez_cost_usd": 0.0001458,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   },
   {
    "id": 20,
@@ -4457,6 +6083,82 @@
   {
    "id": 20,
    "tipo": "fuera",
+   "model": "gpt-4o-mini",
+   "provider": "openai",
+   "outcome": "no_context",
+   "question": "¿Cómo configuro un modelo en Django?",
+   "search_query": "¿Cómo configuro un modelo en Django?",
+   "top_similarity": 0.5774306537583036,
+   "similarities": [
+    0.5774306537583036,
+    0.5709198798908028,
+    0.5670773663152063,
+    0.5646952145256687,
+    0.5644934513864692,
+    0.5576210274571056
+   ],
+   "answer_md": "Esto no está en la documentación de Bootstrap 5.3.",
+   "cited_urls": [],
+   "chunk_urls": [
+    "https://getbootstrap.com/docs/5.3/components/modal/#usage",
+    "https://getbootstrap.com/docs/5.3/components/modal/#options",
+    "https://getbootstrap.com/docs/5.3/getting-started/webpack/#configure-webpack",
+    "https://getbootstrap.com/docs/5.3/components/modal/#via-javascript",
+    "https://getbootstrap.com/docs/5.3/components/modal/#modal-components",
+    "https://getbootstrap.com/docs/5.3/getting-started/parcel/#configure-parcel"
+   ],
+   "v4_hits": [],
+   "v4_retry": false,
+   "error": null,
+   "fallback_from": null,
+   "fallback_error": null,
+   "prompt_tokens": 2924,
+   "completion_tokens": 13,
+   "latency_ms": 1192,
+   "auto": {
+    "error": false,
+    "nego": true,
+    "negativa_ok": true,
+    "v4_en_codigo": false,
+    "cita": null,
+    "fuente_esperada": null
+   },
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   },
+   "jueces": [
+    {
+     "correcta": 2,
+     "sin_errores": 2,
+     "util": 1,
+     "total": 5,
+     "motivo": "La respuesta indica correctamente que la pregunta no se encuentra en la documentación de Bootstrap 5.3 y es directa y concisa, lo que es útil."
+    },
+    null
+   ],
+   "juez_tokens": [
+    {
+     "prompt": 700,
+     "completion": 52
+    },
+    {
+     "prompt": 0,
+     "completion": 0
+    }
+   ],
+   "juez_error": [
+    null,
+    "The service is receiving too many requests from you"
+   ],
+   "nota": 5,
+   "cost_usd": 0.00044639999999999995,
+   "juez_cost_usd": 0.00013619999999999998,
+   "revisar": []
+  },
+  {
+   "id": 20,
+   "tipo": "fuera",
    "model": "gpt-5.4-mini",
    "provider": "openai",
    "outcome": "no_context",
@@ -4503,14 +6205,14 @@
      "sin_errores": 2,
      "util": 1,
      "total": 5,
-     "motivo": "La respuesta identifica correctamente que el tema no está cubierto por la documentación de Bootstrap 5.3 y no explica Django. Es breve, directa y útil para una pregunta fuera de alcance."
+     "motivo": "La respuesta es correcta porque dice que no está en la documentación de Bootstrap 5.3 sin dar información irrelevante sobre Django."
     },
     null
    ],
    "juez_tokens": [
     {
-     "prompt": 699,
-     "completion": 65
+     "prompt": 700,
+     "completion": 48
     },
     {
      "prompt": 0,
@@ -4523,8 +6225,12 @@
    ],
    "nota": 5,
    "cost_usd": 0.00226425,
-   "juez_cost_usd": 0.00014385,
-   "revisar": []
+   "juez_cost_usd": 0.0001338,
+   "revisar": [],
+   "jueces_modelos": {
+    "openai": "gpt-4o-mini",
+    "gemini": "gemini-3.8-flash"
+   }
   }
  ]
 }

@@ -9,7 +9,7 @@
 // Los IDs de credencial se pasan por argumento: nunca se guardan en el repo.
 //
 // Versión liviana de la Fase 4 (acordada con el usuario el 2026-10-03):
-// - solo gpt-5.4-mini, con un reintento HTTP; sin cadena de respaldo Gemini;
+// - solo un modelo OpenAI, con un reintento HTTP; sin cadena de respaldo Gemini;
 // - el prompt recibe las últimas 5 preguntas del tema y, desde la Fase 5, además
 //   hay deduplicación semántica por embedding (umbral calibrado, eval/fase5-dedup.json);
 // - sí: validación por código con un reintento, y opciones barajadas por código.
@@ -25,8 +25,12 @@ const arg = (name) => {
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-// El mismo modelo principal que la Pregunta libre (decisión del 2026-09-29).
-const QUIZ_MODEL = 'gpt-5.4-mini';
+// El mismo modelo principal que la Pregunta libre. Cambiado a gpt-4o-mini el
+// 2026-10-07 (decisión del usuario, por costo: ~5× más barato que
+// gpt-5.4-mini; es un bot de prueba personal, no producción). El formato del
+// quiz lo valida el código con un reintento, no depende de la "inteligencia"
+// del modelo.
+const QUIZ_MODEL = 'gpt-4o-mini';
 // IDs de los workflows del quiz, para [BS] Test Quiz. Un workflow ID no es un secreto.
 const GENERAR_QUIZ_WORKFLOW_ID = 'jmockTStWGiF0gQj';
 const RESPONDER_QUIZ_WORKFLOW_ID = 'RNzvcjm5jpUfzd6G';
@@ -55,13 +59,12 @@ const { QUIZ_SCHEMA, DEDUP_RECENT } = require('./quiz-lib');
 const SCHEMA_EXPR = JSON.stringify(QUIZ_SCHEMA, null, 1);
 if (SCHEMA_EXPR.includes('}}')) throw new Error('QUIZ_SCHEMA no puede quedar con llaves dobles');
 
-const sqlExpr = (file, map) => {
-  let sql = read(file);
-  for (const [k, v] of Object.entries(map)) {
-    if (!sql.includes(k)) throw new Error(`${file}: no contiene ${k}`);
-    sql = sql.split(k).join(`{{ ${v} }}`);
-  }
-  return `=${sql}`;
+// El valor viaja como bind parameter real (scripts/sql-node.js):
+// options.queryReplacement, nunca concatenado dentro del texto del SQL.
+const { sqlQuery } = require('./sql-node');
+const postgresNode = (file, params, consts) => {
+  const { query, queryReplacement } = sqlQuery(path.join(root, file), params, consts);
+  return { operation: 'executeQuery', query, options: queryReplacement ? { queryReplacement } : {} };
 };
 
 const node = (id, name, type, typeVersion, position, parameters, extra = {}) =>
@@ -132,24 +135,17 @@ return { json: {
       additionalFields: { text: 'Preparando otra pregunta…' },
     }, { credentials: telegram, onError: 'continueRegularOutput' }),
 
-    node('g4b', 'Reclamar botón', 'n8n-nodes-base.postgres', 2.7, [770, -140], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/quiz/04_reclamar.sql', {
-        __PARAMS_JSON__: "JSON.stringify({ chat_id: $('Preparar').first().json.chat_id, message_id: $('Preparar').first().json.message_id })",
-      }),
-      options: {},
-    }, { credentials: pg, notes: 'Un doble toque en "Otra pregunta" no genera dos preguntas: solo la primera ejecución reclama el botón (sql/003_quiz_botones.sql).' }),
+    node('g4b', 'Reclamar botón', 'n8n-nodes-base.postgres', 2.7, [770, -140],
+      postgresNode('sql/quiz/04_reclamar.sql', ["{ chat_id: $('Preparar').first().json.chat_id, message_id: $('Preparar').first().json.message_id }"]),
+      { credentials: pg, notes: 'Un doble toque en "Otra pregunta" no genera dos preguntas: solo la primera ejecución reclama el botón (sql/003_quiz_botones.sql).' }),
 
     ifNode('g4c', '¿Primera vez?', [880, -140], '={{ $json.claimed }}', IS_TRUE, '',
       { notes: 'false = otro toque del mismo botón ya está generando la pregunta: esta ejecución termina aquí.' }),
 
-    node('g5', 'Elegir tema', 'n8n-nodes-base.postgres', 2.7, [1000, 0], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/quiz/01_tema.sql', {
-        __PARAMS_JSON__: "JSON.stringify({ chat_id: $('Preparar').first().json.chat_id, hint: $('Preparar').first().json.hint, test_id: $('Preparar').first().json.test_id, rand: $('Preparar').first().json.rand })",
-      }),
-      options: {},
-    }, { credentials: pg, notes: 'Siempre 1 fila: tema, nivel, seed, últimas 5 preguntas y fragmentos (sql/quiz/01_tema.sql). Selección: test → pedido → repaso vencido → 70 % ruta / 30 % tema débil.' }),
+    node('g5', 'Elegir tema', 'n8n-nodes-base.postgres', 2.7, [1000, 0],
+      postgresNode('sql/quiz/01_tema.sql',
+        ["{ chat_id: $('Preparar').first().json.chat_id, hint: $('Preparar').first().json.hint, test_id: $('Preparar').first().json.test_id, rand: $('Preparar').first().json.rand }"]),
+      { credentials: pg, notes: 'Siempre 1 fila: tema, nivel, seed, últimas 5 preguntas y fragmentos (sql/quiz/01_tema.sql). Selección: test → pedido → repaso vencido → 70 % ruta / 30 % tema débil.' }),
 
     node('g6', 'Armar prompt', 'n8n-nodes-base.code', 2, [1100, 0], {
       mode: 'runOnceForEachItem',
@@ -260,14 +256,11 @@ return { json: { ...state, ...tokens, retry: false, outcome: 'ok', model: '${QUI
     }, { credentials: gemini, retryOnFail: true, maxTries: 2, waitBetweenTries: 2000, onError: 'continueRegularOutput',
       notes: 'Deduplicación semántica: pregunta + respuesta correcta (quiz-lib.dedupText). Si Gemini falla, la pregunta se acepta sin comparar.' }),
 
-    node('g10d', 'Buscar parecida', 'n8n-nodes-base.postgres', 2.7, [2310, -420], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/quiz/06_parecida.sql', {
-        __PARAMS_JSON__: "JSON.stringify({ chat_id: $('Validar').item.json.chat_id, topic_key: $('Validar').item.json.topic_key, emb: $json.embedding?.values ? '[' + $json.embedding.values.join(',') + ']' : null })",
-        __RECENT__: String(DEDUP_RECENT),
-      }),
-      options: {},
-    }, { credentials: pg, notes: `La más parecida entre las últimas ${DEDUP_RECENT} preguntas del tema (coseno con pgvector).` }),
+    node('g10d', 'Buscar parecida', 'n8n-nodes-base.postgres', 2.7, [2310, -420],
+      postgresNode('sql/quiz/06_parecida.sql',
+        ["{ chat_id: $('Validar').item.json.chat_id, topic_key: $('Validar').item.json.topic_key, emb: $json.embedding?.values ? '[' + $json.embedding.values.join(',') + ']' : null }"],
+        { RECENT: DEDUP_RECENT }),
+      { credentials: pg, notes: `La más parecida entre las últimas ${DEDUP_RECENT} preguntas del tema (coseno con pgvector).` }),
 
     node('g10e', 'Decidir dedup', 'n8n-nodes-base.code', 2, [2420, -420], {
       mode: 'runOnceForEachItem',
@@ -302,16 +295,12 @@ return { json: { ...state, outcome: 'error',
 
     ifNode('g13', '¿Pregunta lista?', [2420, 0], '={{ $json.outcome }}', { type: 'string', operation: 'equals' }, 'ok'),
 
-    node('g14', 'Guardar', 'n8n-nodes-base.postgres', 2.7, [2640, -140], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/quiz/02_guardar.sql', {
-        __ROW_JSON__: `JSON.stringify({ chat_id: $json.chat_id, topic_key: $json.topic_key, origin: $json.origin, test_id: $json.test_id,
+    node('g14', 'Guardar', 'n8n-nodes-base.postgres', 2.7, [2640, -140],
+      postgresNode('sql/quiz/02_guardar.sql', [`{ chat_id: $json.chat_id, topic_key: $json.topic_key, origin: $json.origin, test_id: $json.test_id,
   chunk_ids: $json.chunk_ids, difficulty: $json.level, format: $json.format, question: $json.question,
   options: $json.options, correct_index: $json.correct_index, explanation: $json.explanation,
-  source_url: $json.source_url, emb: $json.emb, model: $json.model, prompt_tokens: $json.prompt_tokens, completion_tokens: $json.completion_tokens })`,
-      }),
-      options: {},
-    }, { credentials: pg, notes: 'INSERT en quiz_questions; RETURNING id para el callback_data de los botones.' }),
+  source_url: $json.source_url, emb: $json.emb, model: $json.model, prompt_tokens: $json.prompt_tokens, completion_tokens: $json.completion_tokens }`]),
+      { credentials: pg, notes: 'INSERT en quiz_questions; RETURNING id para el callback_data de los botones.' }),
 
     ifNode('g15', '¿dry_run?', [2860, -140], `={{ ${R}.dry_run }}`, IS_TRUE),
 
@@ -394,13 +383,9 @@ function buildResponder() {
     node('a1', 'Entrada', 'n8n-nodes-base.executeWorkflowTrigger', 1.2, [0, 0], { inputSource: 'passthrough' },
       { notes: 'Del router: { chat_id, callback_data: "q:<uuid>:<índice>", callback_query_id, message_id }.' }),
 
-    node('a2', 'Registrar respuesta', 'n8n-nodes-base.postgres', 2.7, [220, 0], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/quiz/03_responder.sql', {
-        __PARAMS_JSON__: 'JSON.stringify({ chat_id: Number($json.chat_id), data: String($json.callback_data ?? "") })',
-      }),
-      options: {},
-    }, { credentials: pg, notes: 'submit_answer con FOR UPDATE: un doble toque devuelve already_answered y no cuenta dos veces.' }),
+    node('a2', 'Registrar respuesta', 'n8n-nodes-base.postgres', 2.7, [220, 0],
+      postgresNode('sql/quiz/03_responder.sql', ['{ chat_id: Number($json.chat_id), data: String($json.callback_data ?? "") }']),
+      { credentials: pg, notes: 'submit_answer con FOR UPDATE: un doble toque devuelve already_answered y no cuenta dos veces.' }),
 
     node('a3', 'Preparar mensajes', 'n8n-nodes-base.code', 2, [440, 0], {
       mode: 'runOnceForEachItem',
@@ -543,11 +528,9 @@ function buildMedirDedup() {
       responseMode: 'responseNode', options: {},
     }, { credentials: testSecret, notes: 'Header X-BS-Test-Secret. Solo lectura.' }),
 
-    node('m2', 'Preguntas', 'n8n-nodes-base.postgres', 2.7, [220, 0], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/quiz/05_medir.sql', { __PARAMS_JSON__: 'JSON.stringify($json.body ?? {})' }),
-      options: {},
-    }, { credentials: pg }),
+    node('m2', 'Preguntas', 'n8n-nodes-base.postgres', 2.7, [220, 0],
+      postgresNode('sql/quiz/05_medir.sql', ['$json.body ?? {}']),
+      { credentials: pg }),
 
     node('m3', 'Armar lote', 'n8n-nodes-base.code', 2, [440, 0], {
       mode: 'runOnceForAllItems',

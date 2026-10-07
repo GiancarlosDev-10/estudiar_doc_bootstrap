@@ -8,5 +8,5 @@
 -- =============================================================================
 
 SELECT start_lesson_test(p.chat_id, sp.topic_key, p.message_id) AS res, sp.title
-  FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS p(chat_id bigint, topic_order int, message_id bigint)
+  FROM jsonb_to_record($1::jsonb) AS p(chat_id bigint, topic_order int, message_id bigint)
   LEFT JOIN study_path sp ON sp.order_index = p.topic_order AND p.topic_order >= 0;

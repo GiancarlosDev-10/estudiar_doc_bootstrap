@@ -22,7 +22,7 @@ SELECT x.content,
        ),
        x.section, x.page, x.heading_path, x.url,
        x.order_index, x.has_code, x.source_path, x.content_hash, x.version
-  FROM jsonb_to_recordset($bsjson$__ROWS_JSON__$bsjson$::jsonb)
+  FROM jsonb_to_recordset($1::jsonb)
        AS x(content text, embedding text, section text, page text, heading_path text[],
             url text, order_index int, has_code boolean, source_path text,
             content_hash text, version text)

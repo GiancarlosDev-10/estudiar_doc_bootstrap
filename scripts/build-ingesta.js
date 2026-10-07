@@ -38,11 +38,12 @@ const filterSrc = [
   chunkerSrc.match(/^function isWantedFile[\s\S]*?^}$/m)[0],
 ].join('\n\n');
 
-// Los marcadores __X_JSON__ del SQL pasan a ser expresiones de n8n.
-const sqlExpr = (file, map) => {
-  let sql = read(file);
-  for (const [k, v] of Object.entries(map)) sql = sql.split(k).join(`{{ ${v} }}`);
-  return `=${sql}`;
+// El valor viaja como bind parameter real (scripts/sql-node.js):
+// options.queryReplacement, nunca concatenado dentro del texto del SQL.
+const { sqlQuery } = require('./sql-node');
+const postgresNode = (file, params) => {
+  const { query, queryReplacement } = sqlQuery(path.join(root, file), params);
+  return { operation: 'executeQuery', query, options: queryReplacement ? { queryReplacement } : {} };
 };
 
 const node = (id, name, type, typeVersion, position, parameters, extra = {}) =>
@@ -102,8 +103,10 @@ $input.all().forEach((item, i) => {
 const { tag } = $('Config').first().json;
 const { chunks, studyPath, warnings } = buildChunks(files, tag);
 
-// $bsjson$ delimita el JSON dentro del SQL: no puede aparecer en el contenido.
-if (JSON.stringify(chunks).includes('$bsjson$')) throw new Error('El contenido incluye el delimitador $bsjson$');
+// Antes había aquí una comprobación de que el contenido no incluyera el
+// delimitador "$bsjson$": ya no hace falta, porque los fragmentos viajan como
+// bind parameters reales (sql/ingesta/01_sync.sql, scripts/sql-node.js) y no
+// dentro de un literal de dollar quoting que ese texto pudiera cerrar.
 
 const bySection = {};
 for (const c of chunks) bySection[c.section] = (bySection[c.section] || 0) + 1;
@@ -113,14 +116,9 @@ return [{ json: {
 } }];`,
   }, { notes: 'Copia de scripts/chunker.js + envoltorio. Regenerar con scripts/build-ingesta.js, no editar a mano.' }),
 
-  node('i7', 'Sincronizar y detectar cambios', 'n8n-nodes-base.postgres', 2.7, [1320, -100], {
-    operation: 'executeQuery',
-    query: sqlExpr('sql/ingesta/01_sync.sql', {
-      __STUDY_PATH_JSON__: 'JSON.stringify($json.studyPath)',
-      __CHUNKS_JSON__: 'JSON.stringify($json.chunks)',
-    }),
-    options: {},
-  }, { credentials: pg, notes: 'Copia de sql/ingesta/01_sync.sql. Devuelve solo los fragmentos nuevos o cambiados.' }),
+  node('i7', 'Sincronizar y detectar cambios', 'n8n-nodes-base.postgres', 2.7, [1320, -100],
+    postgresNode('sql/ingesta/01_sync.sql', ['$json.studyPath', '$json.chunks']),
+    { credentials: pg, notes: 'Copia de sql/ingesta/01_sync.sql. Devuelve solo los fragmentos nuevos o cambiados.' }),
 
   node('i8', 'Preparar lotes', 'n8n-nodes-base.code', 2, [1540, -100], {
     jsCode: `// Agrupa los fragmentos a embeber en lotes de ${BATCH} (una petición por lote).
@@ -177,11 +175,10 @@ const rows = chunks.map((c, k) => {
 return { json: { rows, count: rows.length, tokens: $json.usageMetadata?.promptTokenCount ?? null } };`,
   }),
 
-  node('i11', 'Guardar fragmentos', 'n8n-nodes-base.postgres', 2.7, [2420, -200], {
-    operation: 'executeQuery',
-    query: sqlExpr('sql/ingesta/02_upsert.sql', { __ROWS_JSON__: 'JSON.stringify($json.rows)' }),
-    options: { queryBatching: 'independently' },
-  }, {
+  node('i11', 'Guardar fragmentos', 'n8n-nodes-base.postgres', 2.7, [2420, -200], (() => {
+    const p = postgresNode('sql/ingesta/02_upsert.sql', ['$json.rows']);
+    return { ...p, options: { ...p.options, queryBatching: 'independently' } };
+  })(), {
     credentials: pg,
     // El INSERT no devuelve filas; sin esto el loop se cortaría aquí.
     alwaysOutputData: true,

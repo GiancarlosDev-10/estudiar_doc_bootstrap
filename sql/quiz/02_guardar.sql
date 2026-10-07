@@ -17,7 +17,7 @@ INSERT INTO quiz_questions (chat_id, topic_key, origin, test_id, chunk_ids, diff
 SELECT x.chat_id, x.topic_key, x.origin, x.test_id, x.chunk_ids, x.difficulty, x.format, x.question, x.options,
        x.correct_index, x.explanation, x.source_url, nullif(x.emb, '')::vector,
        x.model, x.prompt_tokens, x.completion_tokens
-  FROM jsonb_to_record($bsjson$__ROW_JSON__$bsjson$::jsonb) AS x(
+  FROM jsonb_to_record($1::jsonb) AS x(
          chat_id bigint, topic_key text, origin text, test_id uuid, chunk_ids uuid[], difficulty text, format text,
          question text, options jsonb, correct_index smallint, explanation text, source_url text, emb text,
          model text, prompt_tokens int, completion_tokens int)

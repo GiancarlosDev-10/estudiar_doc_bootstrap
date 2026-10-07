@@ -12,7 +12,7 @@
 -- =============================================================================
 
 WITH p AS (
-  SELECT * FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint)
+  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint)
 ),
 reg AS (
   INSERT INTO bot_settings (chat_id) SELECT chat_id FROM p

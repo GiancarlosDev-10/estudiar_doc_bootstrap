@@ -10,4 +10,4 @@
 SELECT q.id, q.chat_id, q.topic_key, q.format, q.question, q.options, q.correct_index, q.created_at
   FROM quiz_questions q
  ORDER BY q.created_at DESC
- LIMIT least(coalesce(($bsjson$__PARAMS_JSON__$bsjson$::jsonb ->> 'limit')::int, 45), 45);
+ LIMIT least(coalesce(($1::jsonb ->> 'limit')::int, 45), 45);

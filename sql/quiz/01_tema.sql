@@ -26,7 +26,7 @@
 -- =============================================================================
 
 WITH p AS (
-  SELECT * FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb)
+  SELECT * FROM jsonb_to_record($1::jsonb)
          AS x(chat_id bigint, hint text, test_id uuid, rand float8)
 ),
 actual AS (

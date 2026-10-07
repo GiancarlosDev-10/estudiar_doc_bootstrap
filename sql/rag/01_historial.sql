@@ -12,8 +12,8 @@
 -- Las respuestas se recortan a 600 caracteres: para resolver "¿y en móvil?"
 -- basta el tema, y así la reescritura sale barata.
 --
--- El marcador de parámetros lo reemplaza el build por una expresión de n8n
--- (JSON.stringify + dollar quoting, como en la ingesta).
+-- $1 es un bind parameter real (scripts/sql-node.js): viaja por
+-- options.queryReplacement, nunca concatenado en el texto del SQL.
 -- =============================================================================
 
 SELECT count(*) > 0 AS has_history,
@@ -22,7 +22,7 @@ SELECT count(*) > 0 AS has_history,
   FROM (
     SELECT q.question, q.answer, q.created_at
       FROM rag_queries q,
-           jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS p(chat_id bigint, source text)
+           jsonb_to_record($1::jsonb) AS p(chat_id bigint, source text)
      WHERE p.source = 'telegram'
        AND q.source = 'telegram'
        AND q.chat_id = p.chat_id

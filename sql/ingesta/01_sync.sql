@@ -8,16 +8,19 @@
 --   4. Devuelve SOLO los fragmentos nuevos o con texto distinto: son los únicos
 --      que necesitan embedding. Reindexar sale gratis si nada cambió.
 --
--- Los marcadores de JSON (en mayúsculas, entre guiones bajos) los sustituye el
--- build por expresiones de n8n. El JSON va entre $bsjson$ (dollar quoting): así
--- no hace falta escapar comillas y el texto nunca se interpreta como SQL.
+-- $1 y $2 son bind parameters reales (ver scripts/sql-node.js): el valor
+-- viaja por options.queryReplacement y Postgres lo trata siempre como un
+-- dato, nunca como texto SQL. Antes el JSON se metía entre $bsjson$ (dollar
+-- quoting) con una expresión de n8n; como JSON.stringify no escapa "$", un
+-- contenido que incluyera la etiqueta "$bsjson$" cerraba el literal ahí mismo
+-- y el resto se ejecutaba como SQL (inyección).
 -- =============================================================================
 
 BEGIN;
 
 CREATE TEMP TABLE _sp ON COMMIT DROP AS
 SELECT *
-  FROM jsonb_to_recordset($bsjson$__STUDY_PATH_JSON__$bsjson$::jsonb)
+  FROM jsonb_to_recordset($1::jsonb)
        AS x(topic_key text, order_index int, section text, page text, title text, url text);
 
 -- order_index es UNIQUE: si el sidebar se reordena, dos temas podrían chocar a
@@ -37,7 +40,7 @@ ON CONFLICT (topic_key) DO UPDATE
 CREATE TEMP TABLE _in ON COMMIT DROP AS
 SELECT x.*,
        encode(sha256(convert_to(x.content, 'UTF8')), 'hex') AS content_hash
-  FROM jsonb_to_recordset($bsjson$__CHUNKS_JSON__$bsjson$::jsonb)
+  FROM jsonb_to_recordset($2::jsonb)
        AS x(section text, page text, heading_path text[], url text, order_index int,
             content text, has_code boolean, source_path text, version text);
 

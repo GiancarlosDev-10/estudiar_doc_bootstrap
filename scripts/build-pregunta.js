@@ -39,24 +39,32 @@ const EMBED_DIMS = 1536;
 // (2026-09-29), así que un modelo se valida llamándolo, no solo listándolo.
 // Cadena de modelos: si uno falla (sin saldo, caído, 503, respuesta vacía), la
 // misma pregunta pasa al siguiente.
-// Principal gpt-5.4-mini (decisión del usuario, 2026-09-29) tras compararlo
-// con las mismas 5 preguntas, fragmentos y prompt:
-//   - gpt-4o-mini: ~$0,00056/pregunta, pero 2 de 4 respuestas con errores de
-//     fondo (en la #3 aconsejaba redefinir $theme-colors entero).
-//   - gpt-5.4-mini: ~$0,0030/pregunta, respuestas correctas y más citas.
-//   - Gemini free tier: gratis, pero ese día devolvía 503 en más de la mitad
-//     de las llamadas; queda como respaldo gratuito si OpenAI falla.
-// gpt-5.4-mini usa 0 tokens de razonamiento por defecto (o3/o4-mini gastaban
-// 64–192 solo para decir "ok"). Los Gemini "lite" rechazan thinkingBudget 0.
-// La evaluación completa (20 preguntas + juez) sigue siendo la Fase 6.
+// Historial: el 2026-09-29 se eligió gpt-5.4-mini tras comparar 5 preguntas
+// (mismos fragmentos y prompt): gpt-4o-mini salía ~$0,00056/pregunta pero 2 de
+// 4 respuestas con errores de fondo (en la #3 aconsejaba redefinir
+// $theme-colors entero); gpt-5.4-mini ~$0,0030/pregunta, correcto y con más
+// citas. Gemini free tier quedó como respaldo gratuito (ese día fallaba más
+// de la mitad de las llamadas con 503).
+// 2026-10-07: la Fase 6 (eval/fase6-resultados.json, 20 preguntas, mismos
+// fragmentos y prompt, juez gpt-4o-mini) dio gpt-4o-mini 4,85/5 (0/20 fallos
+// de API, p50 2,6 s, US$0,00048/pregunta) frente a gpt-5.4-mini 4,60
+// (0/20, 2,3 s, US$0,00257): la comparación de 5 preguntas de septiembre no
+// se repitió a 20. Con eso se vuelve a gpt-4o-mini como principal, ahora por
+// costo (~5× más barato) y porque este es un bot de prueba personal, no
+// producción. Ojo: el juez es indulgente y se juzga a sí mismo — en la
+// pregunta #15 (trampa de jumbotron, Bootstrap 4) gpt-4o-mini solo respondió
+// "Esto no está en la documentación de Bootstrap 5.3" cuando la página de
+// migración sí lo cubre, y el juez le dio 5 (real ~2). Ver
+// eval/fase6-conclusion.md para la tabla completa y las limitaciones.
 const MODELS = [
-  { provider: 'openai', model: 'gpt-5.4-mini' },
+  { provider: 'openai', model: 'gpt-4o-mini' },
   { provider: 'gemini', model: 'gemini-3.7-flash' },
   { provider: 'gemini', model: 'gemini-3.5-flash' },
 ];
 // La reescritura de seguimientos usa el modelo principal: si corriera en un
 // Gemini saturado, fallaría en silencio (buscaría con la pregunta original) y
-// el bot perdería el hilo de "¿y en móvil?".
+// el bot perdería el hilo de "¿y en móvil?". Al cambiar MODELS[0] a
+// gpt-4o-mini (2026-10-07), la reescritura pasa a usar gpt-4o-mini también.
 const REWRITE_MODEL = MODELS[0].model;
 // Los modelos Flash "piensan" antes de responder y esos tokens salen del mismo
 // maxOutputTokens: con un tope bajo la respuesta puede llegar VACÍA. Con
@@ -113,16 +121,12 @@ const REWRITE_PROMPT = promptBody(CONSULTA === 'en' ? 'prompts/rag-consulta.md' 
 
 const ragLibSrc = read('scripts/rag-lib.js');
 
-// Igual que en build-ingesta.js: el marcador del SQL pasa a ser una expresión
-// de n8n que arma JSON en runtime, dentro de $bsjson$…$bsjson$. El texto del
-// usuario nunca se concatena como SQL.
-const sqlExpr = (file, map) => {
-  let sql = read(file);
-  for (const [k, v] of Object.entries(map)) {
-    if (!sql.includes(k)) throw new Error(`${file}: no contiene ${k}`);
-    sql = sql.split(k).join(`{{ ${v} }}`);
-  }
-  return `=${sql}`;
+// El valor viaja como bind parameter real (scripts/sql-node.js):
+// options.queryReplacement, nunca concatenado dentro del texto del SQL.
+const { sqlQuery } = require('./sql-node');
+const postgresNode = (file, params, consts) => {
+  const { query, queryReplacement } = sqlQuery(path.join(root, file), params, consts);
+  return { operation: 'executeQuery', query, options: queryReplacement ? { queryReplacement } : {} };
 };
 
 const node = (id, name, type, typeVersion, position, parameters, extra = {}) =>
@@ -197,11 +201,9 @@ return { json: { ...base, empty: false } };`,
 
     ifNode('r3', '¿Vacía?', [440, 0], '={{ $json.empty }}', IS_TRUE),
 
-    node('r4', 'Historial', 'n8n-nodes-base.postgres', 2.7, [660, -120], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/rag/01_historial.sql', { __PARAMS_JSON__: 'JSON.stringify({ chat_id: $json.chat_id, source: $json.source })' }),
-      options: {},
-    }, { credentials: pg, notes: 'Siempre 1 fila: has_history + history_text (sql/rag/01_historial.sql). El eval nunca tiene historial.' }),
+    node('r4', 'Historial', 'n8n-nodes-base.postgres', 2.7, [660, -120],
+      postgresNode('sql/rag/01_historial.sql', ['{ chat_id: $json.chat_id, source: $json.source }']),
+      { credentials: pg, notes: 'Siempre 1 fila: has_history + history_text (sql/rag/01_historial.sql). El eval nunca tiene historial.' }),
 
     ifNode('r5', '¿Hay historial?', [880, -120], '={{ $json.has_history }}', IS_TRUE),
 
@@ -244,11 +246,9 @@ return { json: { ...base, search_query: rewriteResult(llmText($json), base.quest
       { credentials: gemini, ...RETRY,
         notes: 'Embedding asimétrico: consultas con "task: search result | query: …"; los documentos se embebieron con "title: … | text: …" (Fase 2).' }),
 
-    node('r9', 'Buscar fragmentos', 'n8n-nodes-base.postgres', 2.7, [1760, -120], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/rag/02_buscar.sql', { __PARAMS_JSON__: 'JSON.stringify({ q: $json.embedding.values })', __TOPK__: String(TOPK) }),
-      options: {},
-    }, { credentials: pg, notes: `Siempre 1 fila: chunks (top ${TOPK}, JSON) + top_similarity (sql/rag/02_buscar.sql).` }),
+    node('r9', 'Buscar fragmentos', 'n8n-nodes-base.postgres', 2.7, [1760, -120],
+      postgresNode('sql/rag/02_buscar.sql', ['{ q: $json.embedding.values }'], { TOPK }),
+      { credentials: pg, notes: `Siempre 1 fila: chunks (top ${TOPK}, JSON) + top_similarity (sql/rag/02_buscar.sql).` }),
 
     node('r10', 'Armar prompt', 'n8n-nodes-base.code', 2, [1980, -120], {
       mode: 'runOnceForEachItem',
@@ -390,17 +390,13 @@ return { json: { ...p, chunks: undefined, prompt_text: undefined, done: undefine
     node('r16', 'Resultado', 'n8n-nodes-base.noOp', 1, [3080, 0], {}, {
       notes: 'Punto único de convergencia: ayuda, sin contexto, respondida o error, todas con la misma forma (outcome, parts, …).' }),
 
-    node('r17', 'Registrar', 'n8n-nodes-base.postgres', 2.7, [3300, 0], {
-      operation: 'executeQuery',
-      query: sqlExpr('sql/rag/03_registrar.sql', {
-        __ROW_JSON__: `JSON.stringify({ chat_id: $json.chat_id, source: $json.source, question: $json.question,
+    node('r17', 'Registrar', 'n8n-nodes-base.postgres', 2.7, [3300, 0],
+      postgresNode('sql/rag/03_registrar.sql', [`{ chat_id: $json.chat_id, source: $json.source, question: $json.question,
   search_query: $json.search_query ?? $json.question, outcome: $json.outcome, answer: $json.answer_md ?? null,
   chunk_ids: $json.chunk_ids ?? [], similarities: $json.similarities ?? [], top_similarity: $json.top_similarity ?? null,
   cited_urls: $json.cited_urls ?? [], v4_retry: $json.v4_retry === true, model: $json.model ?? null,
-  prompt_tokens: $json.prompt_tokens ?? null, completion_tokens: $json.completion_tokens ?? null, latency_ms: $json.latency_ms ?? null })`,
-      }),
-      options: {},
-    }, { credentials: pg, alwaysOutputData: true, onError: 'continueRegularOutput',
+  prompt_tokens: $json.prompt_tokens ?? null, completion_tokens: $json.completion_tokens ?? null, latency_ms: $json.latency_ms ?? null }`]),
+      { credentials: pg, alwaysOutputData: true, onError: 'continueRegularOutput',
       notes: 'INSERT en rag_queries (no registra la ayuda). Si el registro falla, la respuesta se envía igual: el log no debe dejar al usuario sin respuesta.' }),
 
     ifNode('r18', '¿dry_run?', [3520, 0], "={{ $('Resultado').first().json.dry_run }}", IS_TRUE),

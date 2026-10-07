@@ -10,7 +10,7 @@
 -- =============================================================================
 
 WITH p AS (
-  SELECT * FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint)
+  SELECT * FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint)
 ),
 sec AS (
   SELECT sp.section, min(sp.order_index) AS ord, count(*) AS temas,

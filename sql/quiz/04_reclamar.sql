@@ -10,7 +10,7 @@
 WITH ins AS (
   INSERT INTO quiz_next_clicks (chat_id, message_id)
   SELECT x.chat_id, x.message_id
-    FROM jsonb_to_record($bsjson$__PARAMS_JSON__$bsjson$::jsonb) AS x(chat_id bigint, message_id bigint)
+    FROM jsonb_to_record($1::jsonb) AS x(chat_id bigint, message_id bigint)
   ON CONFLICT DO NOTHING
   RETURNING 1
 )
